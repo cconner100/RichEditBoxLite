@@ -1,0 +1,7 @@
+# RichEditBoxLite v0.1 approval snapshot
+Control: RichEditBoxLite
+Document: RichEditTextDocument, RichEditTextRange
+Formats: RichTextCharacterFormat, RichTextParagraphFormat
+Services: SpellCheckService
+Events: CandidateWindowBoundsChanged, ContextMenuOpening, CopyingToClipboard, CuttingToClipboard, Paste, SelectionChanged, SelectionChanging, TextChanged, TextChanging, TextCompositionChanged, TextCompositionEnded, TextCompositionStarted
+DependencyProperties: AcceptsReturn, CharacterCasing, ClipboardCopyFormat, Description, DesiredCandidateWindowAlignment, DisabledFormattingAccelerators, Header, HeaderTemplate, HorizontalTextAlignment, InputScope, IsColorFontEnabled, IsReadOnly, IsSpellCheckEnabled, IsTextPredictionEnabled, MaxLength, PlaceholderText, PreventKeyboardDisplayOnProgrammaticFocus, ProofingLanguage, ProofingMenuFlyout, SelectionFlyout, SelectionHighlightColor, SelectionHighlightColorWhenNotFocused, TextAlignment, TextReadingOrder, TextWrapping

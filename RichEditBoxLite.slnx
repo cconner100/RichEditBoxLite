@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CConner100.RichEditBoxLite/CConner100.RichEditBoxLite.csproj" />
+  </Folder>
+  <Project Path="RichEditBoxLite.TestApp.Tests/RichEditBoxLite.TestApp.Tests.csproj" />
+  <Project Path="RichEditBoxLite.TestApp.UITests/RichEditBoxLite.TestApp.UITests.csproj" />
+  <Project Path="RichEditBoxLite.TestApp/RichEditBoxLite.TestApp.csproj" />
+</Solution>

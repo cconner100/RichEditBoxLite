@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test-pack:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Unit and API coverage tests
+        run: dotnet test RichEditBoxLite.TestApp.Tests/RichEditBoxLite.TestApp.Tests.csproj -c Release
+      - name: Build Desktop Test UI
+        run: dotnet build RichEditBoxLite.TestApp/RichEditBoxLite.TestApp.csproj -f net10.0-desktop -c Release
+      - name: Build WebAssembly Test UI
+        run: dotnet build RichEditBoxLite.TestApp/RichEditBoxLite.TestApp.csproj -f net10.0-browserwasm -c Release
+      - name: Pack library and symbols
+        run: dotnet pack src/CConner100.RichEditBoxLite/CConner100.RichEditBoxLite.csproj -c Release -o artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: artifacts/*
+
+  mobile-build:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: [net10.0-android, net10.0-ios]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build Test UI
+        run: dotnet build RichEditBoxLite.TestApp/RichEditBoxLite.TestApp.csproj -f ${{ matrix.framework }} -c Release

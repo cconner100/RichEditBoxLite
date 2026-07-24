@@ -1,0 +1,10 @@
+{
+  "background_color": "#ffffff",
+  "description": "RichEditBoxLite.TestApp",
+  "display": "standalone",
+  "name": "RichEditBoxLite.TestApp",
+  "short_name": "RichEditBoxLite.TestApp",
+  "start_url": "/index.html",
+  "theme_color": "#ffffff",
+  "scope": "/"
+}
