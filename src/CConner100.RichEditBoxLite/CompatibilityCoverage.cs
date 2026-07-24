@@ -1,4 +1,4 @@
-namespace RichEditBoxLite.TestApp;
+namespace CConner100.RichEditBoxLite;
 
 public static class CompatibilityCoverage
 {

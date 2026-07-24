@@ -19,7 +19,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RichEditBoxLite.TestApp\RichEditBoxLite.TestApp.csproj" />
     <ProjectReference Include="..\src\CConner100.RichEditBoxLite\CConner100.RichEditBoxLite.csproj" />
   </ItemGroup>
 </Project>

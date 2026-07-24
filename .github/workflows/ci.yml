@@ -9,16 +9,16 @@ jobs:
   test-pack:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
       - name: Unit and API coverage tests
-        run: dotnet test RichEditBoxLite.TestApp.Tests/RichEditBoxLite.TestApp.Tests.csproj -c Release
+        run: dotnet test RichEditBoxLite.TestApp.Tests/RichEditBoxLite.TestApp.Tests.csproj -c Release -p:OverrideTargetFramework=net10.0
       - name: Build Desktop Test UI
-        run: dotnet build RichEditBoxLite.TestApp/RichEditBoxLite.TestApp.csproj -f net10.0-desktop -c Release
+        run: dotnet build RichEditBoxLite.TestApp/RichEditBoxLite.TestApp.csproj -f net10.0-desktop -c Release -p:OverrideTargetFramework=net10.0-desktop
       - name: Build WebAssembly Test UI
-        run: dotnet build RichEditBoxLite.TestApp/RichEditBoxLite.TestApp.csproj -f net10.0-browserwasm -c Release
+        run: dotnet build RichEditBoxLite.TestApp/RichEditBoxLite.TestApp.csproj -f net10.0-browserwasm -c Release -p:OverrideTargetFramework=net10.0-browserwasm
       - name: Pack library and symbols
         run: dotnet pack src/CConner100.RichEditBoxLite/CConner100.RichEditBoxLite.csproj -c Release -o artifacts
       - uses: actions/upload-artifact@v4
@@ -31,11 +31,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        framework: [net10.0-android, net10.0-ios]
+        include:
+          - framework: net10.0-android
+            workload: android
+          - framework: net10.0-ios
+            workload: ios
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
+      - name: Install target workload
+        run: dotnet workload install ${{ matrix.workload }}
       - name: Build Test UI
-        run: dotnet build RichEditBoxLite.TestApp/RichEditBoxLite.TestApp.csproj -f ${{ matrix.framework }} -c Release
+        run: dotnet build RichEditBoxLite.TestApp/RichEditBoxLite.TestApp.csproj -f ${{ matrix.framework }} -c Release -p:OverrideTargetFramework=${{ matrix.framework }}
