@@ -23,7 +23,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 30
     environment:
-      name: nuget.org
+      name: production
       url: https://www.nuget.org/packages/CConner100.RichEditBoxLite/${{ inputs.version }}
     permissions:
       contents: read
