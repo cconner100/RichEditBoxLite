@@ -117,9 +117,44 @@ public sealed class RichEditTextRange
     public void InsertImage(int width, int height, int ascent, VerticalCharacterAlignment verticalAlign, string alternateText, IRandomAccessStream value) =>
         Document.InsertImage(NormalizedStart, width, height, alternateText, value);
 
+    public void ClearFormatting() => ClearFormatting(RichTextClearFormattingOptions.All);
+
+    public void ClearFormatting(RichTextClearFormattingOptions options)
+    {
+        var ownsUndoGroup = !Document.IsInUndoGroup;
+        if (ownsUndoGroup)
+        {
+            Document.BeginUndoGroup();
+        }
+        try
+        {
+            if (options.HasFlag(RichTextClearFormattingOptions.Character))
+            {
+                ResetCharacterFormat();
+            }
+            if (options.HasFlag(RichTextClearFormattingOptions.Paragraph))
+            {
+                ResetParagraphFormat();
+            }
+        }
+        finally
+        {
+            if (ownsUndoGroup)
+            {
+                Document.EndUndoGroup();
+            }
+        }
+    }
+
     internal void ApplyCharacterFormat(Func<CharacterFormatState, CharacterFormatState> change) =>
         Document.ApplyCharacterFormat(NormalizedStart, Math.Max(Length, 1), change);
 
     internal void ApplyParagraphFormat(Func<ParagraphFormatState, ParagraphFormatState> change) =>
         Document.ApplyParagraphFormat(NormalizedStart, Math.Max(Length, 1), change);
+
+    internal void ResetCharacterFormat() =>
+        Document.ApplyCharacterFormat(NormalizedStart, Math.Max(Length, 1), _ => Document.DefaultCharacterFormat);
+
+    internal void ResetParagraphFormat() =>
+        Document.ApplyParagraphFormat(NormalizedStart, Math.Max(Length, 1), _ => Document.DefaultParagraphFormat);
 }

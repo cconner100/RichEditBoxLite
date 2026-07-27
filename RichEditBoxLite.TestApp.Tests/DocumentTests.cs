@@ -92,4 +92,84 @@ public class DocumentTests
         spellcheck.AddWord("es-ES", "codificador");
         spellcheck.Check("codificador", "es-ES").Should().BeEmpty();
     }
+
+    [Test]
+    public void HeadingsAndLists_RoundTripThroughRtfAndSurviveEditing()
+    {
+        var source = new RichDocument();
+        source.SetText(TextSetOptions.None, "Title\nBullet\nOne\nTwo");
+
+        source.GetRange(0, 5).ParagraphFormat.HeadingLevel = RichTextHeadingLevel.Heading1;
+        var bulletStart = source.Text.IndexOf("Bullet", StringComparison.Ordinal);
+        source.GetRange(bulletStart, bulletStart + 6).ParagraphFormat.ListType = MarkerType.Bullet;
+        var oneStart = source.Text.IndexOf("One", StringComparison.Ordinal);
+        source.GetRange(oneStart, source.Length).ParagraphFormat.ListType = MarkerType.Arabic;
+        source.GetRange(oneStart, source.Length).ParagraphFormat.ListStart = 3;
+
+        source.GetRange(bulletStart + 6, bulletStart + 6).Text = " item";
+        source.GetRange(bulletStart, bulletStart + 11).ParagraphFormat.ListType.Should().Be(MarkerType.Bullet);
+
+        source.GetText(TextGetOptions.FormatRtf, out var rtf);
+        rtf.Should().Contain(@"\outlinelevel0");
+        rtf.Should().Contain(@"\pnlvlblt");
+        rtf.Should().Contain(@"\pnlvlbody");
+
+        var target = new RichDocument();
+        target.SetText(TextSetOptions.FormatRtf, rtf);
+
+        target.Text.Should().Be(source.Text);
+        target.GetRange(0, 5).ParagraphFormat.HeadingLevel.Should().Be(RichTextHeadingLevel.Heading1);
+        target.GetRange(bulletStart, bulletStart + 11).ParagraphFormat.ListType.Should().Be(MarkerType.Bullet);
+        target.GetRange(target.Text.IndexOf("One", StringComparison.Ordinal), target.Length).ParagraphFormat.ListType.Should().Be(MarkerType.Arabic);
+        target.GetRange(target.Text.IndexOf("One", StringComparison.Ordinal), target.Length).ParagraphFormat.ListStart.Should().Be(3);
+    }
+
+    [Test]
+    public void ClearFormatting_ResetsCharacterAndParagraphStateWithoutChangingTextOrSelection()
+    {
+        var document = new RichDocument();
+        document.SetText(TextSetOptions.None, "Heading");
+        var selection = document.GetRange(0, document.Length);
+        selection.CharacterFormat.Bold = FormatEffect.On;
+        selection.CharacterFormat.Size = 30;
+        selection.ParagraphFormat.HeadingLevel = RichTextHeadingLevel.Heading2;
+        selection.ParagraphFormat.ListType = MarkerType.Bullet;
+        var start = selection.StartPosition;
+        var end = selection.EndPosition;
+
+        selection.ClearFormatting();
+
+        document.Text.Should().Be("Heading");
+        selection.StartPosition.Should().Be(start);
+        selection.EndPosition.Should().Be(end);
+        selection.CharacterFormat.Bold.Should().Be(FormatEffect.Off);
+        selection.CharacterFormat.Size.Should().Be(document.DefaultCharacterFormat.Size);
+        selection.ParagraphFormat.HeadingLevel.Should().Be(RichTextHeadingLevel.None);
+        selection.ParagraphFormat.ListType.Should().Be(MarkerType.None);
+
+        document.Undo();
+        selection.CharacterFormat.Bold.Should().Be(FormatEffect.On);
+        selection.ParagraphFormat.HeadingLevel.Should().Be(RichTextHeadingLevel.Heading2);
+        selection.ParagraphFormat.ListType.Should().Be(MarkerType.Bullet);
+    }
+
+    [Test]
+    public void RendererListMarkers_UseBulletsAndSequentialArabicNumbers()
+    {
+        var counter = 0;
+        var previousWasOrdered = false;
+
+        RichTextCanvas.GetMarkerText(
+            new ParagraphFormatState { ListType = MarkerType.Bullet },
+            ref counter,
+            ref previousWasOrdered).Should().Be("•");
+        RichTextCanvas.GetMarkerText(
+            new ParagraphFormatState { ListType = MarkerType.Arabic, ListStart = 3 },
+            ref counter,
+            ref previousWasOrdered).Should().Be("3.");
+        RichTextCanvas.GetMarkerText(
+            new ParagraphFormatState { ListType = MarkerType.Arabic, ListStart = 3 },
+            ref counter,
+            ref previousWasOrdered).Should().Be("4.");
+    }
 }

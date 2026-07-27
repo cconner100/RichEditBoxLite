@@ -30,10 +30,11 @@ The public CLR and package namespace is `CConner100.RichEditBoxLite`.
   IME, selection, clipboard, and virtual-keyboard integration.
 - UTF-16 public positions with document/range/selection operations, find,
   case changes, undo/redo, grouped edits, character formatting, paragraph
-  formatting, and inline-object projection (`U+FFFC`).
+  formatting, H1/H2 headings, rendered bullet/Arabic lists, clear formatting,
+  and inline-object projection (`U+FFFC`).
 - Bounded RTF import and canonical export for text, Unicode, font size,
   bold/italic/underline/strike, colors, highlight, subscript, superscript,
-  paragraphs, and tabs.
+  headings, supported lists, paragraphs, and tabs.
 - Built-in lightweight English (`en-US`) and Spanish (`es-ES`) proofing with
   suggestions, ignored words, and custom words.
 - A Fluent-styled control template with WinUI-compatible part/state intent,
@@ -52,8 +53,9 @@ constructors are internal.
 |---|---|
 | Plain text, caret, selection, keyboard input | Implemented through Uno input bridge |
 | Character formats | Implemented for core format run properties |
-| Paragraph alignment/indent/list metadata | Stored; alignment/list painting remains partial |
-| RTF core profile | Implemented and bounded; normalized import |
+| Paragraph headings and lists | H1/H2 plus bullet and Arabic list rendering implemented; other marker styles remain partial |
+| RTF core profile | Implemented and bounded; headings and supported lists round-trip |
+| Clear formatting | Character, paragraph, or combined reset operations implemented |
 | Undo/redo and grouped edits | Implemented |
 | Find, movement, case conversion | Implemented; movement is character-based except unit expansion |
 | Spellcheck en-US/es-ES | Implemented with bundled compact dictionaries |

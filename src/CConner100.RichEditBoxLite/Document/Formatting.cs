@@ -4,6 +4,21 @@ using FontStyle = Windows.UI.Text.FontStyle;
 
 namespace CConner100.RichEditBoxLite;
 
+[Flags]
+public enum RichTextClearFormattingOptions
+{
+    Character = 1,
+    Paragraph = 2,
+    All = Character | Paragraph
+}
+
+public enum RichTextHeadingLevel
+{
+    None,
+    Heading1,
+    Heading2
+}
+
 public sealed record CharacterFormatState
 {
     public string FontFamily { get; init; } = "Open Sans";
@@ -24,6 +39,7 @@ public sealed record CharacterFormatState
 
 public sealed record ParagraphFormatState
 {
+    public RichTextHeadingLevel HeadingLevel { get; init; }
     public ParagraphAlignment Alignment { get; init; } = ParagraphAlignment.Left;
     public float FirstLineIndent { get; init; }
     public float LeftIndent { get; init; }
@@ -67,6 +83,7 @@ public sealed class RichTextCharacterFormat
     public string LanguageTag { get => Current.LanguageTag; set => Apply(f => f with { LanguageTag = value }); }
 
     public RichTextCharacterFormat GetClone() => new(_range.GetClone());
+    public void Reset() => _range.ResetCharacterFormat();
 }
 
 public sealed class RichTextParagraphFormat
@@ -78,6 +95,7 @@ public sealed class RichTextParagraphFormat
     private ParagraphFormatState Current => _range.Document.GetParagraphFormat(_range.StartPosition);
     private void Apply(Func<ParagraphFormatState, ParagraphFormatState> change) => _range.ApplyParagraphFormat(change);
 
+    public RichTextHeadingLevel HeadingLevel { get => Current.HeadingLevel; set => Apply(f => f with { HeadingLevel = value }); }
     public ParagraphAlignment Alignment { get => Current.Alignment; set => Apply(f => f with { Alignment = value }); }
     public float FirstLineIndent => Current.FirstLineIndent;
     public float LeftIndent => Current.LeftIndent;
@@ -95,4 +113,6 @@ public sealed class RichTextParagraphFormat
 
     public void SetLineSpacing(LineSpacingRule rule, float spacing) =>
         Apply(f => f with { LineSpacing = spacing });
+
+    public void Reset() => _range.ResetParagraphFormat();
 }

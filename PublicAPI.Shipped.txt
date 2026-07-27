@@ -2,6 +2,8 @@
 Control: RichEditBoxLite
 Document: RichEditTextDocument, RichEditTextRange
 Formats: RichTextCharacterFormat, RichTextParagraphFormat
+Paragraph styles: RichTextHeadingLevel.None, RichTextHeadingLevel.Heading1, RichTextHeadingLevel.Heading2
+Formatting reset: RichEditTextRange.ClearFormatting(), RichEditTextRange.ClearFormatting(RichTextClearFormattingOptions), RichTextCharacterFormat.Reset(), RichTextParagraphFormat.Reset()
 Services: SpellCheckService
 Events: CandidateWindowBoundsChanged, ContextMenuOpening, CopyingToClipboard, CuttingToClipboard, Paste, SelectionChanged, SelectionChanging, TextChanged, TextChanging, TextCompositionChanged, TextCompositionEnded, TextCompositionStarted
 DependencyProperties: AcceptsReturn, CharacterCasing, ClipboardCopyFormat, Description, DesiredCandidateWindowAlignment, DisabledFormattingAccelerators, Header, HeaderTemplate, HorizontalTextAlignment, InputScope, IsColorFontEnabled, IsReadOnly, IsSpellCheckEnabled, IsTextPredictionEnabled, MaxLength, PlaceholderText, PreventKeyboardDisplayOnProgrammaticFocus, ProofingLanguage, ProofingMenuFlyout, SelectionFlyout, SelectionHighlightColor, SelectionHighlightColorWhenNotFocused, TextAlignment, TextReadingOrder, TextWrapping

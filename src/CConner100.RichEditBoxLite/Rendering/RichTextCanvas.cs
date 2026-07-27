@@ -1,3 +1,4 @@
+using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using SkiaSharp;
 using Uno.WinUI.Graphics2DSK;
@@ -8,6 +9,7 @@ namespace CConner100.RichEditBoxLite;
 internal sealed class RichTextCanvas : SKCanvasElement
 {
     private readonly List<GlyphLayout> _glyphs = [];
+    private readonly List<MarkerLayout> _markers = [];
     private RichEditTextDocument? _document;
 
     public RichEditTextDocument? Document
@@ -56,6 +58,12 @@ internal sealed class RichTextCanvas : SKCanvasElement
             canvas.DrawRect(glyph.Rect, selectionPaint);
         }
 
+        foreach (var marker in _markers)
+        {
+            using var paint = CreatePaint(marker.Format);
+            canvas.DrawText(marker.Text, marker.Rect.Left, GetBaseline(marker.Rect, paint), paint);
+        }
+
         foreach (var glyph in _glyphs)
         {
             var format = glyph.Format;
@@ -67,7 +75,7 @@ internal sealed class RichTextCanvas : SKCanvasElement
             }
             if (glyph.Character != '\n')
             {
-                var baseline = glyph.Rect.Bottom - paint.FontMetrics.Descent;
+                var baseline = GetBaseline(glyph.Rect, paint);
                 if (format.Subscript) baseline += format.Size * .25f;
                 if (format.Superscript) baseline -= format.Size * .35f;
                 canvas.DrawText(glyph.Character.ToString(), glyph.Rect.Left, baseline, paint);
@@ -104,15 +112,40 @@ internal sealed class RichTextCanvas : SKCanvasElement
     private void Layout(float width)
     {
         _glyphs.Clear();
+        _markers.Clear();
         if (_document is null) return;
         var x = HorizontalPadding;
         var y = VerticalPadding;
         var available = Math.Max(20, width - HorizontalPadding * 2);
         var lineHeight = 22f;
+        var lineStartX = HorizontalPadding;
+        var orderedListCounter = 0;
+        var previousWasOrdered = false;
         for (var index = 0; index < _document.Text.Length; index++)
         {
             var ch = _document.Text[index];
-            var format = _document.GetCharacterFormat(index);
+            var paragraphStart = index == 0 || _document.Text[index - 1] == '\n';
+            var paragraphFormat = _document.GetParagraphFormat(index);
+            var format = ApplyParagraphStyle(_document.GetCharacterFormat(index), paragraphFormat);
+            if (paragraphStart)
+            {
+                lineHeight = Math.Max(22, format.Size * 1.45f);
+                var paragraphIndent = Math.Max(0, paragraphFormat.LeftIndent);
+                lineStartX = HorizontalPadding + paragraphIndent;
+                x = lineStartX;
+                var markerText = GetMarkerText(paragraphFormat, ref orderedListCounter, ref previousWasOrdered);
+                if (markerText is not null)
+                {
+                    using var markerPaint = CreatePaint(format);
+                    var markerWidth = markerPaint.MeasureText(markerText);
+                    _markers.Add(new MarkerLayout(
+                        markerText,
+                        new SKRect(x, y, x + markerWidth, y + lineHeight),
+                        format));
+                    x += Math.Max(28, markerWidth + 8);
+                    lineStartX = x;
+                }
+            }
             using var paint = CreatePaint(format);
             lineHeight = Math.Max(lineHeight, format.Size * 1.45f);
             var isLineBreak = ch is '\r' or '\n';
@@ -130,7 +163,7 @@ internal sealed class RichTextCanvas : SKCanvasElement
             if (isLineBreak || x + glyphWidth > HorizontalPadding + available)
             {
                 _glyphs.Add(new GlyphLayout(index, ch, new SKRect(x, y, x + Math.Max(1, glyphWidth), y + lineHeight), format));
-                x = HorizontalPadding;
+                x = lineStartX;
                 y += lineHeight;
                 lineHeight = 22;
                 if (isLineBreak) continue;
@@ -167,7 +200,47 @@ internal sealed class RichTextCanvas : SKCanvasElement
         };
     }
 
+    private static CharacterFormatState ApplyParagraphStyle(CharacterFormatState format, ParagraphFormatState paragraph) =>
+        paragraph.HeadingLevel switch
+        {
+            RichTextHeadingLevel.Heading1 => format with { Bold = true, Size = Math.Max(32, format.Size) },
+            RichTextHeadingLevel.Heading2 => format with { Bold = true, Size = Math.Max(24, format.Size) },
+            _ => format
+        };
+
+    internal static string? GetMarkerText(
+        ParagraphFormatState paragraph,
+        ref int orderedListCounter,
+        ref bool previousWasOrdered)
+    {
+        if (paragraph.ListType == MarkerType.Bullet)
+        {
+            previousWasOrdered = false;
+            orderedListCounter = 0;
+            return "•";
+        }
+        if (paragraph.ListType == MarkerType.Arabic)
+        {
+            orderedListCounter = previousWasOrdered
+                ? orderedListCounter + 1
+                : Math.Max(1, paragraph.ListStart);
+            previousWasOrdered = true;
+            return $"{orderedListCounter}.";
+        }
+        previousWasOrdered = false;
+        orderedListCounter = 0;
+        return null;
+    }
+
+    private static float GetBaseline(SKRect rect, SKPaint paint)
+    {
+        var metrics = paint.FontMetrics;
+        var textHeight = metrics.Descent - metrics.Ascent;
+        return rect.Top + (rect.Height - textHeight) / 2 - metrics.Ascent;
+    }
+
     private static SKColor ToSkColor(Windows.UI.Color color) => new(color.R, color.G, color.B, color.A);
     private void OnDocumentChanged(object? sender, EventArgs e) { InvalidateMeasure(); Invalidate(); }
     private sealed record GlyphLayout(int Index, char Character, SKRect Rect, CharacterFormatState Format);
+    private sealed record MarkerLayout(string Text, SKRect Rect, CharacterFormatState Format);
 }
