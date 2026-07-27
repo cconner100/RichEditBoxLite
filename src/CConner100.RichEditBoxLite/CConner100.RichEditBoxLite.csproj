@@ -26,7 +26,6 @@
     </UnoFeatures>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="Dictionaries/**" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../LICENSE" Pack="true" PackagePath="" />
     <None Include="../../THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="" />
     <None Include="../../README.md" Pack="true" PackagePath="" />
