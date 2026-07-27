@@ -1,8 +1,16 @@
 # RichEditBoxLite
 
+[![NuGet](https://img.shields.io/nuget/v/CConner100.RichEditBoxLite.svg)](https://www.nuget.org/packages/CConner100.RichEditBoxLite/)
+
 `RichEditBoxLite` is an experimental WinUI-shaped rich-text editor for Uno
 Platform's Skia renderer. It targets Desktop, WebAssembly, Android, and iOS and
 does not target WinAppSDK or Uno native rendering.
+
+Install the current package:
+
+```bash
+dotnet add package CConner100.RichEditBoxLite --version 0.1.0
+```
 
 ```xml
 xmlns:rte="using:CConner100.RichEditBoxLite"
@@ -12,8 +20,7 @@ xmlns:rte="using:CConner100.RichEditBoxLite"
     TextChanged="Editor_TextChanged" />
 ```
 
-The public CLR and package namespace is `CConner100.RichEditBoxLite`. The
-package has not been published to NuGet.
+The public CLR and package namespace is `CConner100.RichEditBoxLite`.
 
 ## What is implemented
 
