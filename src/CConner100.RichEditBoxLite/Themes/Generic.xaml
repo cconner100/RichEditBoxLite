@@ -86,8 +86,7 @@
                       AutomationProperties.AccessibilityView="Raw"
                       Background="Transparent"
                       BorderThickness="0"
-                      Foreground="Transparent"
-                      SelectionHighlightColor="Transparent"
+                      Opacity="0"
                       Padding="8,6"
                       HorizontalAlignment="Stretch"
                       VerticalAlignment="Stretch" />

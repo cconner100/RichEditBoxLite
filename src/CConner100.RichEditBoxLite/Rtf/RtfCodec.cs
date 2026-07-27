@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.UI.Text;
 using Windows.UI;
 
 namespace CConner100.RichEditBoxLite;
@@ -27,8 +28,11 @@ internal static partial class RtfCodec
         var colors = ParseColorTable(rtf);
         var text = new StringBuilder();
         var runs = new List<FormatRun>();
+        var paragraphs = new Dictionary<int, ParagraphFormatState>();
         var stack = new Stack<ParserState>();
         var state = new ParserState(new CharacterFormatState(), false, 1);
+        var paragraphFormat = new ParagraphFormatState();
+        var paragraphStart = 0;
         var runStart = 0;
 
         void Flush()
@@ -91,7 +95,7 @@ internal static partial class RtfCodec
                     int? parameter = numberStart < i && int.TryParse(rtf[numberStart..i], out var number) ? number * sign : null;
                     if (i < rtf.Length && rtf[i] == ' ') i++;
 
-                    if (word is "fonttbl" or "colortbl" or "stylesheet" or "info" or "pict" or "object" or "mmath" or "xmlopen")
+                    if (word is "fonttbl" or "colortbl" or "stylesheet" or "info" or "pict" or "object" or "mmath" or "xmlopen" or "listtable" or "listoverridetable" or "listtext" or "pntxtb" or "pntxta")
                     {
                         state = state with { Skip = true };
                         break;
@@ -112,8 +116,38 @@ internal static partial class RtfCodec
                         case "cf" when parameter is not null && parameter.Value < colors.Count: Flush(); state = state with { Format = state.Format with { ForegroundColor = colors[parameter.Value] } }; break;
                         case "highlight" when parameter is not null && parameter.Value < colors.Count: Flush(); state = state with { Format = state.Format with { BackgroundColor = colors[parameter.Value] } }; break;
                         case "plain": Flush(); state = state with { Format = new CharacterFormatState() }; break;
+                        case "pard": paragraphFormat = new ParagraphFormatState(); break;
+                        case "ql": paragraphFormat = paragraphFormat with { Alignment = ParagraphAlignment.Left }; break;
+                        case "qc": paragraphFormat = paragraphFormat with { Alignment = ParagraphAlignment.Center }; break;
+                        case "qr": paragraphFormat = paragraphFormat with { Alignment = ParagraphAlignment.Right }; break;
+                        case "qj": paragraphFormat = paragraphFormat with { Alignment = ParagraphAlignment.Justify }; break;
+                        case "fi" when parameter is not null: paragraphFormat = paragraphFormat with { FirstLineIndent = parameter.Value / 20f }; break;
+                        case "li" when parameter is not null: paragraphFormat = paragraphFormat with { LeftIndent = parameter.Value / 20f }; break;
+                        case "ri" when parameter is not null: paragraphFormat = paragraphFormat with { RightIndent = parameter.Value / 20f }; break;
+                        case "sb" when parameter is not null: paragraphFormat = paragraphFormat with { SpaceBefore = parameter.Value / 20f }; break;
+                        case "sa" when parameter is not null: paragraphFormat = paragraphFormat with { SpaceAfter = parameter.Value / 20f }; break;
+                        case "sl" when parameter is not null: paragraphFormat = paragraphFormat with { LineSpacing = parameter.Value / 20f }; break;
+                        case "outlinelevel" when parameter is not null:
+                            paragraphFormat = paragraphFormat with
+                            {
+                                HeadingLevel = parameter.Value switch
+                                {
+                                    0 => RichTextHeadingLevel.Heading1,
+                                    1 => RichTextHeadingLevel.Heading2,
+                                    _ => RichTextHeadingLevel.None
+                                }
+                            };
+                            break;
+                        case "pnlvlblt": paragraphFormat = paragraphFormat with { ListType = MarkerType.Bullet }; break;
+                        case "pnlvlbody": paragraphFormat = paragraphFormat with { ListType = MarkerType.Arabic }; break;
+                        case "pnstart" when parameter is not null: paragraphFormat = paragraphFormat with { ListStart = Math.Max(1, parameter.Value) }; break;
                         case "par":
-                        case "line": text.Append('\n'); break;
+                        case "line":
+                            paragraphs[paragraphStart] = paragraphFormat;
+                            text.Append('\n');
+                            paragraphStart = text.Length;
+                            paragraphFormat = new ParagraphFormatState();
+                            break;
                         case "tab": text.Append('\t'); break;
                         case "emdash": text.Append('—'); break;
                         case "endash": text.Append('–'); break;
@@ -144,7 +178,11 @@ internal static partial class RtfCodec
         }
 
         Flush();
-        document.ReplaceFromCodec(text.ToString(), runs);
+        if (text.Length > 0 || paragraphFormat != new ParagraphFormatState())
+        {
+            paragraphs[paragraphStart] = paragraphFormat;
+        }
+        document.ReplaceFromCodec(text.ToString(), runs, paragraphs);
     }
 
     public static string Export(RichEditTextDocument document)
@@ -163,44 +201,95 @@ internal static partial class RtfCodec
         }
         builder.Append('}');
 
-        foreach (var run in document.Runs.Count > 0 ? document.Runs : [new FormatRun(0, document.Length, document.DefaultCharacterFormat)])
+        CharacterFormatState? activeFormat = null;
+        for (var position = 0; position < document.Length; position++)
         {
-            var format = run.Format;
-            builder.Append(@"\f0\fs").Append((int)Math.Round(format.Size * 2));
-            if (format.Bold) builder.Append(@"\b");
-            if (format.Italic) builder.Append(@"\i");
-            if (format.Underline) builder.Append(@"\ul");
-            if (format.Strikethrough) builder.Append(@"\strike");
-            if (format.Subscript) builder.Append(@"\sub");
-            if (format.Superscript) builder.Append(@"\super");
-            var foreground = colors.IndexOf(format.ForegroundColor);
-            if (foreground >= 0) builder.Append(@"\cf").Append(foreground + 1);
-            var background = colors.IndexOf(format.BackgroundColor);
-            if (background >= 0) builder.Append(@"\highlight").Append(background + 1);
-            builder.Append(' ');
-            AppendEscaped(builder, document.GetText(run.Start, run.Length));
-            builder.Append(@"\plain ");
+            if (position == 0 || document.Text[position - 1] == '\n')
+            {
+                AppendParagraphFormat(builder, document.GetParagraphFormat(position));
+                activeFormat = null;
+            }
+
+            var format = document.GetCharacterFormat(position);
+            if (format != activeFormat)
+            {
+                AppendCharacterFormat(builder, format, colors);
+                activeFormat = format;
+            }
+
+            var ch = document.Text[position];
+            if (ch == '\n')
+            {
+                builder.Append(@"\par ");
+                activeFormat = null;
+            }
+            else
+            {
+                AppendEscaped(builder, ch);
+            }
         }
 
         return builder.Append('}').ToString();
     }
 
-    private static void AppendEscaped(StringBuilder builder, string text)
+    private static void AppendCharacterFormat(StringBuilder builder, CharacterFormatState format, List<Color> colors)
     {
-        foreach (var ch in text)
+        builder.Append(@"\plain\f0\fs").Append((int)Math.Round(format.Size * 2));
+        if (format.Bold) builder.Append(@"\b");
+        if (format.Italic) builder.Append(@"\i");
+        if (format.Underline) builder.Append(@"\ul");
+        if (format.Strikethrough) builder.Append(@"\strike");
+        if (format.Subscript) builder.Append(@"\sub");
+        if (format.Superscript) builder.Append(@"\super");
+        var foreground = colors.IndexOf(format.ForegroundColor);
+        if (foreground >= 0) builder.Append(@"\cf").Append(foreground + 1);
+        var background = colors.IndexOf(format.BackgroundColor);
+        if (background >= 0) builder.Append(@"\highlight").Append(background + 1);
+        builder.Append(' ');
+    }
+
+    private static void AppendParagraphFormat(StringBuilder builder, ParagraphFormatState format)
+    {
+        builder.Append(@"\pard");
+        builder.Append(format.Alignment switch
         {
-            switch (ch)
-            {
-                case '\\': builder.Append(@"\\"); break;
-                case '{': builder.Append(@"\{"); break;
-                case '}': builder.Append(@"\}"); break;
-                case '\n': builder.Append(@"\par "); break;
-                case '\t': builder.Append(@"\tab "); break;
-                default:
-                    if (ch <= 0x7f) builder.Append(ch);
-                    else builder.Append(@"\u").Append((short)ch).Append('?');
-                    break;
-            }
+            ParagraphAlignment.Center => @"\qc",
+            ParagraphAlignment.Right => @"\qr",
+            ParagraphAlignment.Justify => @"\qj",
+            _ => @"\ql"
+        });
+        if (format.FirstLineIndent != 0) builder.Append(@"\fi").Append(ToTwips(format.FirstLineIndent));
+        if (format.LeftIndent != 0) builder.Append(@"\li").Append(ToTwips(format.LeftIndent));
+        if (format.RightIndent != 0) builder.Append(@"\ri").Append(ToTwips(format.RightIndent));
+        if (format.SpaceBefore != 0) builder.Append(@"\sb").Append(ToTwips(format.SpaceBefore));
+        if (format.SpaceAfter != 0) builder.Append(@"\sa").Append(ToTwips(format.SpaceAfter));
+        if (format.LineSpacing != 0) builder.Append(@"\sl").Append(ToTwips(format.LineSpacing));
+        if (format.HeadingLevel == RichTextHeadingLevel.Heading1) builder.Append(@"\outlinelevel0");
+        if (format.HeadingLevel == RichTextHeadingLevel.Heading2) builder.Append(@"\outlinelevel1");
+        if (format.ListType == MarkerType.Bullet)
+        {
+            builder.Append(@"{\pn\pnlvlblt\pnstart1\pnindent360{\pntxtb\bullet}}");
+        }
+        else if (format.ListType == MarkerType.Arabic)
+        {
+            builder.Append(@"{\pn\pnlvlbody\pnstart").Append(Math.Max(1, format.ListStart)).Append(@"\pnindent360{\pntxta .}}");
+        }
+    }
+
+    private static int ToTwips(float value) => (int)Math.Round(value * 20);
+
+    private static void AppendEscaped(StringBuilder builder, char ch)
+    {
+        switch (ch)
+        {
+            case '\\': builder.Append(@"\\"); break;
+            case '{': builder.Append(@"\{"); break;
+            case '}': builder.Append(@"\}"); break;
+            case '\t': builder.Append(@"\tab "); break;
+            default:
+                if (ch <= 0x7f) builder.Append(ch);
+                else builder.Append(@"\u").Append((short)ch).Append('?');
+                break;
         }
     }
 

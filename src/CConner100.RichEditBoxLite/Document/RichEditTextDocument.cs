@@ -34,6 +34,7 @@ public sealed class RichEditTextDocument
     public string Text => _text;
     public int Length => _text.Length;
     internal IReadOnlyList<FormatRun> Runs => _runs;
+    internal bool IsInUndoGroup => _inUndoGroup;
 
     public bool CanCopy() => Selection.Length > 0;
     public bool CanPaste() => true;
@@ -122,8 +123,11 @@ public sealed class RichEditTextDocument
         length = Math.Clamp(length, 0, Length - start);
         RecordUndo();
         var inherited = GetCharacterFormat(Math.Max(0, start - 1));
+        var inheritedParagraph = GetParagraphFormat(start);
+        var previousParagraphs = _paragraphFormats.ToArray();
         _text = _text.Remove(start, length).Insert(start, replacement);
         RebuildRunsAfterReplace(start, length, replacement.Length, inherited);
+        RebuildParagraphsAfterReplace(previousParagraphs, start, length, replacement.Length, inheritedParagraph);
         Selection.SetRange(start + replacement.Length, start + replacement.Length);
         Changed?.Invoke(this, EventArgs.Empty);
     }
@@ -203,11 +207,22 @@ public sealed class RichEditTextDocument
         Replace(position, 0, "\uFFFC");
     }
 
-    internal void ReplaceFromCodec(string text, IEnumerable<FormatRun> runs)
+    internal void ReplaceFromCodec(
+        string text,
+        IEnumerable<FormatRun> runs,
+        IReadOnlyDictionary<int, ParagraphFormatState>? paragraphs = null)
     {
         _text = text;
         _runs.Clear();
         _runs.AddRange(runs);
+        _paragraphFormats.Clear();
+        if (paragraphs is not null)
+        {
+            foreach (var paragraph in paragraphs)
+            {
+                _paragraphFormats[paragraph.Key] = paragraph.Value;
+            }
+        }
         Selection.SetRange(0, 0);
         ClearUndoRedoHistory();
         Changed?.Invoke(this, EventArgs.Empty);
@@ -241,6 +256,36 @@ public sealed class RichEditTextDocument
         }
     }
 
+    private void RebuildParagraphsAfterReplace(
+        IReadOnlyList<KeyValuePair<int, ParagraphFormatState>> previous,
+        int start,
+        int removed,
+        int inserted,
+        ParagraphFormatState inherited)
+    {
+        _paragraphFormats.Clear();
+        var removedEnd = start + removed;
+        var delta = inserted - removed;
+        foreach (var pair in previous)
+        {
+            var mapped = pair.Key <= start
+                ? pair.Key
+                : pair.Key >= removedEnd
+                    ? pair.Key + delta
+                    : -1;
+            if (mapped >= 0 && mapped <= Length && (mapped == 0 || _text[mapped - 1] == '\n'))
+            {
+                _paragraphFormats[mapped] = pair.Value;
+            }
+        }
+
+        var inheritedStart = StartOfUnit(Math.Clamp(start, 0, Length), TextRangeUnit.Paragraph);
+        if (inherited != DefaultParagraphFormat)
+        {
+            _paragraphFormats[inheritedStart] = inherited;
+        }
+    }
+
     private void RecordUndo()
     {
         if (!_inUndoGroup) PushUndo(Capture());
@@ -259,7 +304,11 @@ public sealed class RichEditTextDocument
     }
 
     private DocumentSnapshot Capture() => new(_text, _runs.ToArray(), new Dictionary<int, ParagraphFormatState>(_paragraphFormats), Selection.StartPosition, Selection.EndPosition);
-    private bool SnapshotEquals(DocumentSnapshot snapshot) => snapshot.Text == _text && snapshot.Runs.SequenceEqual(_runs);
+    private bool SnapshotEquals(DocumentSnapshot snapshot) =>
+        snapshot.Text == _text
+        && snapshot.Runs.SequenceEqual(_runs)
+        && snapshot.Paragraphs.Count == _paragraphFormats.Count
+        && snapshot.Paragraphs.All(pair => _paragraphFormats.TryGetValue(pair.Key, out var value) && value == pair.Value);
     private void Restore(DocumentSnapshot snapshot)
     {
         _text = snapshot.Text;

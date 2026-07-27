@@ -60,6 +60,15 @@ public sealed partial class MainPage : Page
     private void Strike_Click(object sender, RoutedEventArgs e) => Toggle(effect => effect.Strikethrough, (effect, value) => effect.Strikethrough = value);
     private void Subscript_Click(object sender, RoutedEventArgs e) => Toggle(effect => effect.Subscript, (effect, value) => effect.Subscript = value);
     private void Superscript_Click(object sender, RoutedEventArgs e) => Toggle(effect => effect.Superscript, (effect, value) => effect.Superscript = value);
+    private void Heading1_Click(object sender, RoutedEventArgs e) => SetHeading(RichTextHeadingLevel.Heading1);
+    private void Heading2_Click(object sender, RoutedEventArgs e) => SetHeading(RichTextHeadingLevel.Heading2);
+    private void NormalParagraph_Click(object sender, RoutedEventArgs e) => SetHeading(RichTextHeadingLevel.None);
+    private void ClearFormatting_Click(object sender, RoutedEventArgs e)
+    {
+        Editor.Document.Selection.ClearFormatting();
+        DocumentApiResult.Text = "Character and paragraph formatting cleared";
+        UpdateStatus();
+    }
     private void Undo_Click(object sender, RoutedEventArgs e) { Editor.Document.Undo(); DocumentApiResult.Text = "Undo"; }
     private void Redo_Click(object sender, RoutedEventArgs e) { Editor.Document.Redo(); DocumentApiResult.Text = "Redo"; }
     private void Uppercase_Click(object sender, RoutedEventArgs e) { Editor.Document.Selection.ChangeCase(LetterCase.Upper); DocumentApiResult.Text = "Selection changed to upper case"; }
@@ -74,8 +83,18 @@ public sealed partial class MainPage : Page
     private void AlignLeft_Click(object sender, RoutedEventArgs e) => SetAlignment(ParagraphAlignment.Left);
     private void AlignCenter_Click(object sender, RoutedEventArgs e) => SetAlignment(ParagraphAlignment.Center);
     private void AlignRight_Click(object sender, RoutedEventArgs e) => SetAlignment(ParagraphAlignment.Right);
-    private void BulletList_Click(object sender, RoutedEventArgs e) { Editor.Document.Selection.ParagraphFormat.ListType = MarkerType.Bullet; DocumentApiResult.Text = "Bullet paragraph"; }
-    private void NumberList_Click(object sender, RoutedEventArgs e) { Editor.Document.Selection.ParagraphFormat.ListType = MarkerType.Arabic; DocumentApiResult.Text = "Numbered paragraph"; }
+    private void BulletList_Click(object sender, RoutedEventArgs e)
+    {
+        Editor.Document.Selection.ParagraphFormat.ListType = MarkerType.Bullet;
+        DocumentApiResult.Text = "Bullet paragraph";
+        UpdateStatus();
+    }
+    private void NumberList_Click(object sender, RoutedEventArgs e)
+    {
+        Editor.Document.Selection.ParagraphFormat.ListType = MarkerType.Arabic;
+        DocumentApiResult.Text = "Numbered paragraph";
+        UpdateStatus();
+    }
 
     private void SaveRtf_Click(object sender, RoutedEventArgs e)
     {
@@ -193,6 +212,12 @@ public sealed partial class MainPage : Page
         UpdateStatus();
     }
     private void SetAlignment(ParagraphAlignment alignment) { Editor.Document.Selection.ParagraphFormat.Alignment = alignment; DocumentApiResult.Text = $"Alignment: {alignment}"; }
+    private void SetHeading(RichTextHeadingLevel heading)
+    {
+        Editor.Document.Selection.ParagraphFormat.HeadingLevel = heading;
+        DocumentApiResult.Text = $"Paragraph style: {heading}";
+        UpdateStatus();
+    }
     private string SelectionDetails() => $"start={Editor.Document.Selection.StartPosition}, end={Editor.Document.Selection.EndPosition}";
     private static string CompositionDetails(RichEditBoxLiteCompositionEventArgs e) => $"text={e.Text}, start={e.Start}, length={e.Length}";
     private void UpdateStatus()
@@ -200,7 +225,8 @@ public sealed partial class MainPage : Page
         CharacterCount.Text = $"{Editor.Document.Length:N0} characters";
         SelectionStatus.Text = $"Selection {Editor.Document.Selection.StartPosition}:{Editor.Document.Selection.Length}";
         var format = Editor.Document.Selection.CharacterFormat;
-        FormatStatus.Text = $"B:{format.Bold} I:{format.Italic} U:{format.Underline}";
+        var paragraph = Editor.Document.Selection.ParagraphFormat;
+        FormatStatus.Text = $"B:{format.Bold} I:{format.Italic} U:{format.Underline} H:{paragraph.HeadingLevel} L:{paragraph.ListType}";
         PlainTextView.Text = Editor.Document.Text;
     }
     private void Log(string name, string details)

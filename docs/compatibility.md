@@ -12,15 +12,18 @@ model, Skia painting, and an Uno text-input bridge.
 - Core RTF parsing/export, bounds checking, unknown destination policy, and
   deterministic round trips.
 - Document/range APIs, UTF-16 compatibility positions, grapheme-aware editing,
-  undo transactions, find, formatting, lists, hyperlinks, and inline objects.
+  undo transactions, find, formatting, H1/H2 headings, bullet/Arabic lists,
+  clear formatting, hyperlinks, and inline objects.
 - English/Spanish dictionaries, tokenization, suggestions, ignore/custom words.
 - Fluent template resources, visual states, context UI, and most Test UI
   automation.
 
-The repository currently implements the foundation of these items. Incremental
-layout caching, grapheme-aware movement, hyperlink activation, embedded bitmap
-painting, structural RTF tables, and sanitized HTML clipboard import remain
-follow-up work and are not reported as complete.
+The repository currently implements the foundation of these items, including
+rendered and RTF-round-tripped H1/H2 headings and bullet/Arabic lists.
+Incremental layout caching, grapheme-aware movement, additional list marker
+styles, hyperlink activation, embedded bitmap painting, structural RTF tables,
+and sanitized HTML clipboard import remain follow-up work and are not reported
+as complete.
 
 ## Requires Uno/platform services
 
