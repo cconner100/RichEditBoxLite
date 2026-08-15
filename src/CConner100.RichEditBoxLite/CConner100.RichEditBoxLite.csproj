@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>CConner100.RichEditBoxLite</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Authors>Curtis Conner</Authors>
     <Description>A WinUI-shaped RichEditBox control rendered by Uno Platform's Skia renderer.</Description>
     <PackageTags>uno;skia;richeditbox;rich-text;editor</PackageTags>

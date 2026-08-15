@@ -9,7 +9,7 @@ does not target WinAppSDK or Uno native rendering.
 Install the current package:
 
 ```bash
-dotnet add package CConner100.RichEditBoxLite --version 0.1.0
+dotnet add package CConner100.RichEditBoxLite --version 0.1.1
 ```
 
 ```xml
@@ -21,6 +21,18 @@ xmlns:rte="using:CConner100.RichEditBoxLite"
 ```
 
 The public CLR and package namespace is `CConner100.RichEditBoxLite`.
+
+## Fixes in 0.1.1
+
+- Pointer clicks now place the caret using the rendered rich-text glyph layout,
+  including wrapped lines and mixed font sizes ([#17](https://github.com/cconner100/RichEditBoxLite/issues/17)).
+- Wrapped text now follows the live editor viewport instead of a fixed fallback
+  width, while `NoWrap` retains horizontal scrolling ([#18](https://github.com/cconner100/RichEditBoxLite/issues/18)).
+- Fixed macOS focus rendering so the hidden input bridge does not paint over the
+  Skia surface ([#8](https://github.com/cconner100/RichEditBoxLite/issues/8)).
+- Added H1/H2 headings, rendered bullet and Arabic-numbered lists, paragraph
+  formatting persistence, and undoable clear-formatting operations
+  ([#9](https://github.com/cconner100/RichEditBoxLite/issues/9)).
 
 ## What is implemented
 
@@ -49,7 +61,7 @@ The public surface is deliberately WinUI-shaped, but a few types must come from
 `CConner100.RichEditBoxLite` because Uno's WinUI event-argument and text-object
 constructors are internal.
 
-| Area | v0.1 status |
+| Area | v0.1.1 status |
 |---|---|
 | Plain text, caret, selection, keyboard input | Implemented through Uno input bridge |
 | Character formats | Implemented for core format run properties |
