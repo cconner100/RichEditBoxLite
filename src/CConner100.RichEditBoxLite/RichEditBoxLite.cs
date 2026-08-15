@@ -185,6 +185,7 @@ public sealed class RichEditBoxLite : Control
         _inputBridge.Paste += OnInputPaste;
         _inputBridge.CopyingToClipboard += OnInputCopying;
         _inputBridge.CuttingToClipboard += OnInputCutting;
+        _inputBridge.AddHandler(PointerPressedEvent, new PointerEventHandler(OnInputPointerPressed), true);
         _lastText = Document.Text;
     }
 
@@ -198,6 +199,7 @@ public sealed class RichEditBoxLite : Control
         _inputBridge.Paste -= OnInputPaste;
         _inputBridge.CopyingToClipboard -= OnInputCopying;
         _inputBridge.CuttingToClipboard -= OnInputCutting;
+        _inputBridge.RemoveHandler(PointerPressedEvent, new PointerEventHandler(OnInputPointerPressed));
     }
 
     private void AttachContentElement()
@@ -267,6 +269,24 @@ public sealed class RichEditBoxLite : Control
     }
 
     private void OnInputFocusChanged(object sender, RoutedEventArgs e) => UpdateVisuals();
+    private void OnInputPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (_inputBridge is null || _canvas is null) return;
+        var pointer = e.GetCurrentPoint(_canvas);
+        if (!pointer.Properties.IsLeftButtonPressed) return;
+
+        SelectCanvasPosition(pointer.Position);
+        e.Handled = true;
+    }
+
+    private void SelectCanvasPosition(Point point)
+    {
+        if (_inputBridge is null || _canvas is null) return;
+        var position = _canvas.GetPositionFromPoint(point, _canvas.ActualWidth);
+        _inputBridge.Focus(FocusState.Pointer);
+        _inputBridge.Select(position, 0);
+    }
+
     private void OnInputPaste(object sender, TextControlPasteEventArgs e) { var args = new RichEditBoxLitePasteEventArgs(); Paste?.Invoke(this, args); e.Handled = args.Handled; }
     private void OnInputCopying(object sender, TextControlCopyingToClipboardEventArgs e) { var args = new RichEditBoxLiteClipboardEventArgs(); CopyingToClipboard?.Invoke(this, args); e.Handled = args.Handled; }
     private void OnInputCutting(object sender, TextControlCuttingToClipboardEventArgs e) { var args = new RichEditBoxLiteClipboardEventArgs(); CuttingToClipboard?.Invoke(this, args); e.Handled = args.Handled; }

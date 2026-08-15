@@ -1,5 +1,6 @@
 using CConner100.RichEditBoxLite;
 using Microsoft.UI.Text;
+using Windows.Foundation;
 using RichDocument = CConner100.RichEditBoxLite.RichEditTextDocument;
 
 namespace RichEditBoxLite.TestApp.Tests;
@@ -177,5 +178,20 @@ public class DocumentTests
     public void RendererMeasure_UsesViewportWidthWhenWrappingConstraintIsInfinite()
     {
         RichTextCanvas.ResolveMeasureWidth(double.PositiveInfinity, 320).Should().Be(320);
+    }
+
+    [Test]
+    public void RendererHitTest_RoundTripsWrappedFormattedTextPosition()
+    {
+        var document = new RichDocument();
+        document.SetText(TextSetOptions.None, "one two three four five six seven");
+        var formattedStart = document.Text.IndexOf("four", StringComparison.Ordinal);
+        document.GetRange(formattedStart, formattedStart + 4).CharacterFormat.Size = 32;
+        var expectedPosition = document.Text.IndexOf("six", StringComparison.Ordinal);
+        var caretRect = RichTextCanvas.GetPositionRect(document, expectedPosition, 110);
+        var actualPosition = RichTextCanvas.GetPositionFromPoint(
+            document, new Point(caretRect.X, caretRect.Y + caretRect.Height / 2), 110);
+
+        actualPosition.Should().Be(expectedPosition);
     }
 }
