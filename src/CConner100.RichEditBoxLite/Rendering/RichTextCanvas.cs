@@ -97,6 +97,28 @@ internal sealed class RichTextCanvas : SKCanvasElement
                 ? viewportWidth
                 : 1;
 
+    internal int GetPositionFromPoint(Point point, double layoutWidth)
+    {
+        Layout((float)Math.Max(1, layoutWidth));
+        return GetPositionFromPoint(_glyphs, point, _document?.Length ?? 0);
+    }
+
+    internal static int GetPositionFromPoint(RichEditTextDocument document, Point point, double layoutWidth)
+    {
+        var glyphs = new List<GlyphLayout>();
+        var markers = new List<MarkerLayout>();
+        Layout(document, (float)Math.Max(1, layoutWidth), TextWrapping.Wrap, 8, 6, SKColors.Black, glyphs, markers);
+        return GetPositionFromPoint(glyphs, point, document.Length);
+    }
+
+    internal static Rect GetPositionRect(RichEditTextDocument document, int position, double layoutWidth)
+    {
+        var glyphs = new List<GlyphLayout>();
+        var markers = new List<MarkerLayout>();
+        Layout(document, (float)Math.Max(1, layoutWidth), TextWrapping.Wrap, 8, 6, SKColors.Black, glyphs, markers);
+        return GetRectForPosition(glyphs, position, 8, 6);
+    }
+
     protected override void RenderOverride(SKCanvas canvas, Size area)
     {
         Layout((float)Math.Max(1, area.Width));
@@ -109,14 +131,14 @@ internal sealed class RichTextCanvas : SKCanvasElement
 
         foreach (var marker in _markers)
         {
-            using var paint = CreatePaint(marker.Format);
+            using var paint = CreatePaint(marker.Format, DefaultTextColor);
             canvas.DrawText(marker.Text, marker.Rect.Left, GetBaseline(marker.Rect, paint), paint);
         }
 
         foreach (var glyph in _glyphs)
         {
             var format = glyph.Format;
-            using var paint = CreatePaint(format);
+            using var paint = CreatePaint(format, DefaultTextColor);
             if (format.BackgroundColor.A > 0)
             {
                 using var background = new SKPaint { Color = ToSkColor(format.BackgroundColor) };
@@ -163,31 +185,44 @@ internal sealed class RichTextCanvas : SKCanvasElement
         _glyphs.Clear();
         _markers.Clear();
         if (_document is null) return;
-        var x = HorizontalPadding;
-        var y = VerticalPadding;
-        var available = Math.Max(20, width - HorizontalPadding * 2);
+        Layout(_document, width, TextWrapping, HorizontalPadding, VerticalPadding, DefaultTextColor, _glyphs, _markers);
+    }
+
+    private static void Layout(
+        RichEditTextDocument document,
+        float width,
+        TextWrapping textWrapping,
+        float horizontalPadding,
+        float verticalPadding,
+        SKColor defaultTextColor,
+        List<GlyphLayout> glyphs,
+        List<MarkerLayout> markers)
+    {
+        var x = horizontalPadding;
+        var y = verticalPadding;
+        var available = Math.Max(20, width - horizontalPadding * 2);
         var lineHeight = 22f;
-        var lineStartX = HorizontalPadding;
+        var lineStartX = horizontalPadding;
         var orderedListCounter = 0;
         var previousWasOrdered = false;
-        for (var index = 0; index < _document.Text.Length; index++)
+        for (var index = 0; index < document.Text.Length; index++)
         {
-            var ch = _document.Text[index];
-            var paragraphStart = index == 0 || _document.Text[index - 1] == '\n';
-            var paragraphFormat = _document.GetParagraphFormat(index);
-            var format = ApplyParagraphStyle(_document.GetCharacterFormat(index), paragraphFormat);
+            var ch = document.Text[index];
+            var paragraphStart = index == 0 || document.Text[index - 1] == '\n';
+            var paragraphFormat = document.GetParagraphFormat(index);
+            var format = ApplyParagraphStyle(document.GetCharacterFormat(index), paragraphFormat);
             if (paragraphStart)
             {
                 lineHeight = Math.Max(22, format.Size * 1.45f);
                 var paragraphIndent = Math.Max(0, paragraphFormat.LeftIndent);
-                lineStartX = HorizontalPadding + paragraphIndent;
+                lineStartX = horizontalPadding + paragraphIndent;
                 x = lineStartX;
                 var markerText = GetMarkerText(paragraphFormat, ref orderedListCounter, ref previousWasOrdered);
                 if (markerText is not null)
                 {
-                    using var markerPaint = CreatePaint(format);
+                    using var markerPaint = CreatePaint(format, defaultTextColor);
                     var markerWidth = markerPaint.MeasureText(markerText);
-                    _markers.Add(new MarkerLayout(
+                    markers.Add(new MarkerLayout(
                         markerText,
                         new SKRect(x, y, x + markerWidth, y + lineHeight),
                         format));
@@ -195,10 +230,10 @@ internal sealed class RichTextCanvas : SKCanvasElement
                     lineStartX = x;
                 }
             }
-            using var paint = CreatePaint(format);
+            using var paint = CreatePaint(format, defaultTextColor);
             lineHeight = Math.Max(lineHeight, format.Size * 1.45f);
             var isLineBreak = ch is '\r' or '\n';
-            if (ch == '\n' && index > 0 && _document.Text[index - 1] == '\r')
+            if (ch == '\n' && index > 0 && document.Text[index - 1] == '\r')
             {
                 continue;
             }
@@ -209,32 +244,80 @@ internal sealed class RichTextCanvas : SKCanvasElement
                 '\uFFFC' => Math.Max(48, format.Size * 3),
                 _ => Math.Max(1, paint.MeasureText(ch.ToString()) + format.Spacing)
             };
-            if (isLineBreak || TextWrapping != TextWrapping.NoWrap && x + glyphWidth > HorizontalPadding + available)
+            if (isLineBreak)
             {
-                _glyphs.Add(new GlyphLayout(index, ch, new SKRect(x, y, x + Math.Max(1, glyphWidth), y + lineHeight), format));
+                glyphs.Add(new GlyphLayout(index, ch, new SKRect(x, y, x + Math.Max(1, glyphWidth), y + lineHeight), format));
                 x = lineStartX;
                 y += lineHeight;
                 lineHeight = 22;
-                if (isLineBreak) continue;
+                continue;
             }
-            _glyphs.Add(new GlyphLayout(index, ch, new SKRect(x, y, x + glyphWidth, y + lineHeight), format));
+            if (textWrapping != TextWrapping.NoWrap && x + glyphWidth > horizontalPadding + available)
+            {
+                x = lineStartX;
+                y += lineHeight;
+                lineHeight = Math.Max(22, format.Size * 1.45f);
+            }
+            glyphs.Add(new GlyphLayout(index, ch, new SKRect(x, y, x + glyphWidth, y + lineHeight), format));
             x += glyphWidth;
         }
     }
 
     private Rect GetRectForPosition(int position)
+        => GetRectForPosition(_glyphs, position, HorizontalPadding, VerticalPadding);
+
+    private static Rect GetRectForPosition(
+        IReadOnlyList<GlyphLayout> glyphs,
+        int position,
+        float horizontalPadding,
+        float verticalPadding)
     {
-        if (_glyphs.Count == 0) return new Rect(HorizontalPadding, VerticalPadding, 1, 22);
-        if (position >= _glyphs.Count)
+        if (glyphs.Count == 0) return new Rect(horizontalPadding, verticalPadding, 1, 22);
+        position = Math.Max(0, position);
+        var glyph = glyphs.FirstOrDefault(candidate => candidate.Index >= position);
+        if (glyph is null)
         {
-            var last = _glyphs[^1].Rect;
+            var last = glyphs[^1].Rect;
             return new Rect(last.Right, last.Top, 1, last.Height);
         }
-        var rect = _glyphs[Math.Max(0, position)].Rect;
+        var rect = glyph.Rect;
         return new Rect(rect.Left, rect.Top, 1, rect.Height);
     }
 
-    private SKPaint CreatePaint(CharacterFormatState format)
+    private static int GetPositionFromPoint(IReadOnlyList<GlyphLayout> glyphs, Point point, int documentLength)
+    {
+        if (glyphs.Count == 0) return 0;
+
+        var lines = glyphs
+            .GroupBy(glyph => glyph.Rect.Top)
+            .Select(group => group.OrderBy(glyph => glyph.Rect.Left).ToArray())
+            .ToArray();
+        var line = lines.MinBy(candidate => VerticalDistance(point.Y, candidate))!;
+
+        foreach (var glyph in line)
+        {
+            var midpoint = glyph.Rect.Left + glyph.Rect.Width / 2;
+            if (point.X < midpoint) return Math.Clamp(glyph.Index, 0, documentLength);
+            if (point.X <= glyph.Rect.Right)
+            {
+                var position = glyph.Character is '\r' or '\n' ? glyph.Index : glyph.Index + 1;
+                return Math.Clamp(position, 0, documentLength);
+            }
+        }
+
+        var last = line[^1];
+        var endPosition = last.Character is '\r' or '\n' ? last.Index : last.Index + 1;
+        return Math.Clamp(endPosition, 0, documentLength);
+    }
+
+    private static double VerticalDistance(double y, IReadOnlyList<GlyphLayout> line)
+    {
+        var top = line.Min(glyph => glyph.Rect.Top);
+        var bottom = line.Max(glyph => glyph.Rect.Bottom);
+        return y < top ? top - y : y > bottom ? y - bottom : 0;
+    }
+
+    private static SKPaint CreatePaint(CharacterFormatState format, SKColor defaultTextColor)
     {
         var style = format.Bold && format.Italic ? SKFontStyle.BoldItalic
             : format.Bold ? SKFontStyle.Bold
@@ -243,7 +326,7 @@ internal sealed class RichTextCanvas : SKCanvasElement
         return new SKPaint
         {
             IsAntialias = true,
-            Color = format.ForegroundColor.A == 0 ? DefaultTextColor : ToSkColor(format.ForegroundColor),
+            Color = format.ForegroundColor.A == 0 ? defaultTextColor : ToSkColor(format.ForegroundColor),
             TextSize = format.Size,
             Typeface = SKTypeface.FromFamilyName(format.FontFamily, style)
         };
