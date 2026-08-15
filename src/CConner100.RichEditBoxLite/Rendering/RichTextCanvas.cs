@@ -11,6 +11,8 @@ internal sealed class RichTextCanvas : SKCanvasElement
     private readonly List<GlyphLayout> _glyphs = [];
     private readonly List<MarkerLayout> _markers = [];
     private RichEditTextDocument? _document;
+    private TextWrapping _textWrapping = TextWrapping.Wrap;
+    private double _viewportWidth;
 
     public RichEditTextDocument? Document
     {
@@ -40,13 +42,60 @@ internal sealed class RichTextCanvas : SKCanvasElement
     public float HorizontalPadding { get; set; } = 8;
     public float VerticalPadding { get; set; } = 6;
 
+    public TextWrapping TextWrapping
+    {
+        get => _textWrapping;
+        set
+        {
+            if (_textWrapping == value) return;
+            _textWrapping = value;
+            InvalidateMeasure();
+            Invalidate();
+        }
+    }
+
+    public double ViewportWidth
+    {
+        get => _viewportWidth;
+        set
+        {
+            var width = double.IsFinite(value) ? Math.Max(0, value) : 0;
+            if (Math.Abs(_viewportWidth - width) < .5) return;
+            _viewportWidth = width;
+            InvalidateMeasure();
+            Invalidate();
+        }
+    }
+
     protected override Size MeasureOverride(Size availableSize)
     {
-        var width = double.IsInfinity(availableSize.Width) ? 640 : Math.Max(1, availableSize.Width);
-        Layout((float)width);
+        double width;
+        if (TextWrapping == TextWrapping.NoWrap)
+        {
+            Layout(float.PositiveInfinity);
+            var contentRight = Math.Max(
+                _glyphs.Count == 0 ? HorizontalPadding : _glyphs.Max(glyph => glyph.Rect.Right),
+                _markers.Count == 0 ? HorizontalPadding : _markers.Max(marker => marker.Rect.Right));
+            var contentWidth = contentRight + HorizontalPadding;
+            width = double.IsFinite(availableSize.Width)
+                ? Math.Max(Math.Max(1, availableSize.Width), contentWidth)
+                : Math.Max(1, contentWidth);
+        }
+        else
+        {
+            width = ResolveMeasureWidth(availableSize.Width, ViewportWidth);
+            Layout((float)width);
+        }
         var height = _glyphs.Count == 0 ? 32 : _glyphs.Max(g => g.Rect.Bottom) + VerticalPadding;
         return new Size(width, Math.Max(32, height));
     }
+
+    internal static double ResolveMeasureWidth(double availableWidth, double viewportWidth) =>
+        double.IsFinite(availableWidth)
+            ? Math.Max(1, availableWidth)
+            : double.IsFinite(viewportWidth) && viewportWidth > 0
+                ? viewportWidth
+                : 1;
 
     protected override void RenderOverride(SKCanvas canvas, Size area)
     {
@@ -160,7 +209,7 @@ internal sealed class RichTextCanvas : SKCanvasElement
                 '\uFFFC' => Math.Max(48, format.Size * 3),
                 _ => Math.Max(1, paint.MeasureText(ch.ToString()) + format.Spacing)
             };
-            if (isLineBreak || x + glyphWidth > HorizontalPadding + available)
+            if (isLineBreak || TextWrapping != TextWrapping.NoWrap && x + glyphWidth > HorizontalPadding + available)
             {
                 _glyphs.Add(new GlyphLayout(index, ch, new SKRect(x, y, x + Math.Max(1, glyphWidth), y + lineHeight), format));
                 x = lineStartX;
