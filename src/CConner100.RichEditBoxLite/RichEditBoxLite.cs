@@ -15,12 +15,15 @@ namespace CConner100.RichEditBoxLite;
 
 [TemplatePart(Name = InputBridgePartName, Type = typeof(TextBox))]
 [TemplatePart(Name = CanvasPartName, Type = typeof(RichTextCanvas))]
+[TemplatePart(Name = ContentElementPartName, Type = typeof(ScrollViewer))]
 public sealed class RichEditBoxLite : Control
 {
     private const string InputBridgePartName = "PART_InputBridge";
     private const string CanvasPartName = "PART_Canvas";
+    private const string ContentElementPartName = "ContentElement";
     private TextBox? _inputBridge;
     private RichTextCanvas? _canvas;
+    private ScrollViewer? _contentElement;
     private bool _updatingBridge;
     private bool _updatingDocument;
     private string _lastText = string.Empty;
@@ -108,13 +111,16 @@ public sealed class RichEditBoxLite : Control
     protected override void OnApplyTemplate()
     {
         DetachInputBridge();
+        DetachContentElement();
         base.OnApplyTemplate();
         _inputBridge = GetTemplateChild(InputBridgePartName) as TextBox;
         _canvas = GetTemplateChild(CanvasPartName) as RichTextCanvas;
+        _contentElement = GetTemplateChild(ContentElementPartName) as ScrollViewer;
         if (_canvas is not null)
         {
             _canvas.Document = Document;
         }
+        AttachContentElement();
         UpdateBridgeProperties();
         AttachInputBridge();
         UpdateVisuals();
@@ -194,6 +200,33 @@ public sealed class RichEditBoxLite : Control
         _inputBridge.CuttingToClipboard -= OnInputCutting;
     }
 
+    private void AttachContentElement()
+    {
+        if (_contentElement is null) return;
+        _contentElement.SizeChanged += OnContentElementSizeChanged;
+        UpdateCanvasViewportWidth();
+    }
+
+    private void DetachContentElement()
+    {
+        if (_contentElement is not null)
+        {
+            _contentElement.SizeChanged -= OnContentElementSizeChanged;
+        }
+    }
+
+    private void OnContentElementSizeChanged(object sender, SizeChangedEventArgs e) =>
+        UpdateCanvasViewportWidth(e.NewSize.Width);
+
+    private void UpdateCanvasViewportWidth(double fallbackWidth = 0)
+    {
+        if (_canvas is null || _contentElement is null) return;
+        var viewportWidth = _contentElement.ViewportWidth;
+        _canvas.ViewportWidth = viewportWidth > 0 ? viewportWidth
+            : fallbackWidth > 0 ? fallbackWidth
+            : _contentElement.ActualWidth;
+    }
+
     private void OnInputTextChanged(object sender, TextChangedEventArgs e)
     {
         if (_updatingBridge || _inputBridge is null) return;
@@ -256,16 +289,31 @@ public sealed class RichEditBoxLite : Control
 
     private void UpdateBridgeProperties()
     {
-        if (_inputBridge is null) return;
-        _inputBridge.AcceptsReturn = AcceptsReturn;
-        _inputBridge.IsReadOnly = IsReadOnly;
-        _inputBridge.IsSpellCheckEnabled = false;
-        _inputBridge.IsTextPredictionEnabled = IsTextPredictionEnabled;
-        _inputBridge.MaxLength = MaxLength;
-        _inputBridge.TextWrapping = TextWrapping;
-        _inputBridge.TextAlignment = TextAlignment;
-        _inputBridge.InputScope = InputScope;
-        _inputBridge.PreventKeyboardDisplayOnProgrammaticFocus = PreventKeyboardDisplayOnProgrammaticFocus;
+        if (_inputBridge is not null)
+        {
+            _inputBridge.AcceptsReturn = AcceptsReturn;
+            _inputBridge.IsReadOnly = IsReadOnly;
+            _inputBridge.IsSpellCheckEnabled = false;
+            _inputBridge.IsTextPredictionEnabled = IsTextPredictionEnabled;
+            _inputBridge.MaxLength = MaxLength;
+            _inputBridge.TextWrapping = TextWrapping;
+            _inputBridge.TextAlignment = TextAlignment;
+            _inputBridge.InputScope = InputScope;
+            _inputBridge.PreventKeyboardDisplayOnProgrammaticFocus = PreventKeyboardDisplayOnProgrammaticFocus;
+        }
+        if (_canvas is not null)
+        {
+            _canvas.TextWrapping = TextWrapping;
+        }
+        if (_contentElement is not null)
+        {
+            var scrollHorizontally = TextWrapping == TextWrapping.NoWrap;
+            _contentElement.HorizontalScrollMode = scrollHorizontally ? ScrollMode.Enabled : ScrollMode.Disabled;
+            _contentElement.HorizontalScrollBarVisibility = scrollHorizontally
+                ? ScrollBarVisibility.Auto
+                : ScrollBarVisibility.Disabled;
+            UpdateCanvasViewportWidth();
+        }
     }
 
     private void UpdateVisuals()

@@ -72,7 +72,8 @@
                 CornerRadius="{TemplateBinding CornerRadius}">
               <ScrollViewer
                   x:Name="ContentElement"
-                  HorizontalScrollBarVisibility="Auto"
+                  HorizontalScrollMode="Disabled"
+                  HorizontalScrollBarVisibility="Disabled"
                   VerticalScrollBarVisibility="Auto"
                   ZoomMode="Disabled">
                 <Grid MinHeight="64">

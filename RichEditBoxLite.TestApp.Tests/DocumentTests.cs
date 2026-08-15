@@ -172,4 +172,10 @@ public class DocumentTests
             ref counter,
             ref previousWasOrdered).Should().Be("4.");
     }
+
+    [Test]
+    public void RendererMeasure_UsesViewportWidthWhenWrappingConstraintIsInfinite()
+    {
+        RichTextCanvas.ResolveMeasureWidth(double.PositiveInfinity, 320).Should().Be(320);
+    }
 }
