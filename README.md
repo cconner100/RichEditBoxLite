@@ -47,6 +47,10 @@ The public CLR and package namespace is `CConner100.RichEditBoxLite`.
 - Bounded RTF import and canonical export for text, Unicode, font size,
   bold/italic/underline/strike, colors, highlight, subscript, superscript,
   headings, supported lists, paragraphs, and tabs.
+- Bounded, sanitized HTML import (`Document.SetHtml`) and deterministic
+  canonical HTML export (`Document.GetHtml`) for the supported formatting
+  profile, with HTML clipboard paste routed through the same codec. See
+  [docs/html.md](docs/html.md).
 - Built-in lightweight English (`en-US`) and Spanish (`es-ES`) proofing with
   suggestions, ignored words, and custom words.
 - A Fluent-styled control template with WinUI-compatible part/state intent,
@@ -74,7 +78,8 @@ constructors are internal.
 | Hyperlinks | Link metadata surface exists; activation UI is not implemented |
 | Images | Inline placeholder projection exists; binary PNG/JPEG persistence/painting is not implemented |
 | Imported tables | Normalized editable text; structural table API is intentionally absent |
-| HTML clipboard import | Not implemented |
+| HTML import/export | Bounded `SetHtml`/`GetHtml` codec for the supported profile; unsupported CSS, tables, images, and links are documented lossy |
+| HTML clipboard import | Implemented through the shared HTML codec where the host exposes the clipboard HTML format |
 | Touch selection handles | Delegated to the Uno TextBox bridge; host support varies |
 | IME/dead keys/virtual keyboard | Delegated to Uno; requires target-device validation |
 | Accessibility | Value automation pattern implemented; full text patterns depend on Uno runtime support |
@@ -111,9 +116,11 @@ Monitor, and Accessibility/Stress.
 
 ## Security profile
 
-RTF input is capped at 16 MiB and 256 nested groups. Remote images are never
-loaded. Unsupported binary/object/math destinations are discarded during
-normalized import. Malformed unbalanced input is rejected.
+RTF and HTML input share the same caps: 16 MiB of input and 256 levels of
+nesting. Remote resources are never loaded. Unsupported binary/object/math
+destinations and unsafe HTML (`script`, `style`, `iframe`, `object`, embedded
+media) are discarded during normalized import. Malformed unbalanced RTF is
+rejected; malformed HTML is recovered browser-style within the same bounds.
 
 ## License
 
