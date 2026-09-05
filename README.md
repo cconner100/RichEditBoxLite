@@ -9,7 +9,7 @@ does not target WinAppSDK or Uno native rendering.
 Install the current package:
 
 ```bash
-dotnet add package CConner100.RichEditBoxLite --version 0.1.1
+dotnet add package CConner100.RichEditBoxLite --version 0.1.2
 ```
 
 ```xml
@@ -21,6 +21,16 @@ xmlns:rte="using:CConner100.RichEditBoxLite"
 ```
 
 The public CLR and package namespace is `CConner100.RichEditBoxLite`.
+
+## What's new in 0.1.2
+
+- Bounded, sanitized HTML import (`Document.SetHtml`) and deterministic
+  canonical HTML export (`Document.GetHtml`), with HTML clipboard paste routed
+  through the same package-owned codec
+  ([#24](https://github.com/cconner100/RichEditBoxLite/issues/24)). Supported
+  profile, security bounds, and lossy behavior are documented in
+  [docs/html.md](docs/html.md).
+- Updated to Uno.Sdk 6.7.22.
 
 ## Fixes in 0.1.1
 
@@ -65,7 +75,7 @@ The public surface is deliberately WinUI-shaped, but a few types must come from
 `CConner100.RichEditBoxLite` because Uno's WinUI event-argument and text-object
 constructors are internal.
 
-| Area | v0.1.1 status |
+| Area | v0.1.2 status |
 |---|---|
 | Plain text, caret, selection, keyboard input | Implemented through Uno input bridge |
 | Character formats | Implemented for core format run properties |
