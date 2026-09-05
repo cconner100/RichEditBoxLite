@@ -8,8 +8,8 @@ namespace CConner100.RichEditBoxLite;
 
 internal static partial class RtfCodec
 {
-    private const int MaximumInputLength = 16 * 1024 * 1024;
-    private const int MaximumGroupDepth = 256;
+    private const int MaximumInputLength = CodecLimits.MaximumInputLength;
+    private const int MaximumGroupDepth = CodecLimits.MaximumNestingDepth;
 
     public static void Import(RichEditTextDocument document, string rtf)
     {

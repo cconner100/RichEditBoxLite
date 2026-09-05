@@ -113,6 +113,13 @@
                             <Button AutomationProperties.AutomationId="MalformedRtf" Content="Malformed fixture" Click="MalformedRtf_Click" />
                             <Button AutomationProperties.AutomationId="InsertImage" Content="Image placeholder" Click="InsertImage_Click" />
                         </StackPanel>
+                        <TextBox x:Name="HtmlText" AutomationProperties.AutomationId="HtmlText"
+                                 Header="Sanitized HTML" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="120" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button AutomationProperties.AutomationId="SaveHtml" Content="Export HTML" Click="SaveHtml_Click" />
+                            <Button AutomationProperties.AutomationId="LoadHtml" Content="Import HTML" Click="LoadHtml_Click" />
+                            <Button AutomationProperties.AutomationId="LoadHtmlFixture" Content="HTML fixture" Click="LoadHtmlFixture_Click" />
+                        </StackPanel>
                         <TextBox x:Name="PlainTextView" AutomationProperties.AutomationId="PlainTextView"
                                  Header="Plain-text projection" IsReadOnly="True" AcceptsReturn="True" />
                         <TextBlock Text="Imported RTF tables are normalized to editable text in v1. U+FFFC is used for inline image objects." TextWrapping="Wrap" />

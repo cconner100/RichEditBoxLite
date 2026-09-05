@@ -114,6 +114,22 @@ public sealed partial class MainPage : Page
         LoadRtf_Click(sender, e);
     }
     private void MalformedRtf_Click(object sender, RoutedEventArgs e) { RtfText.Text = @"{\rtf1\ansi \b malformed"; LoadRtf_Click(sender, e); }
+    private void SaveHtml_Click(object sender, RoutedEventArgs e)
+    {
+        HtmlText.Text = Editor.Document.GetHtml();
+        PlainTextView.Text = Editor.Document.Text;
+    }
+    private void LoadHtml_Click(object sender, RoutedEventArgs e)
+    {
+        try { Editor.Document.SetHtml(HtmlText.Text); RuntimeStatus.Text = "● HTML imported"; }
+        catch (Exception exception) { RuntimeStatus.Text = $"HTML rejected: {exception.Message}"; }
+        PlainTextView.Text = Editor.Document.Text;
+    }
+    private void LoadHtmlFixture_Click(object sender, RoutedEventArgs e)
+    {
+        HtmlText.Text = "<h1>RichEditBoxLite</h1><p>Dear <strong>Customer</strong>,</p><p style=\"color: rgb(230, 0, 0);\">Español: á é í ó ú ü ñ ¿ ¡</p><ul><li>First</li><li>Second</li></ul><script>alert('discarded')</script>";
+        LoadHtml_Click(sender, e);
+    }
     private void InsertImage_Click(object sender, RoutedEventArgs e)
     {
         using var stream = new InMemoryRandomAccessStream();

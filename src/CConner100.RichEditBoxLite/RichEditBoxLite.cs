@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using System.Runtime.InteropServices.WindowsRuntime;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 using Windows.System;
 using Windows.UI.Core;
@@ -287,7 +288,57 @@ public sealed class RichEditBoxLite : Control
         _inputBridge.Select(position, 0);
     }
 
-    private void OnInputPaste(object sender, TextControlPasteEventArgs e) { var args = new RichEditBoxLitePasteEventArgs(); Paste?.Invoke(this, args); e.Handled = args.Handled; }
+    private async void OnInputPaste(object sender, TextControlPasteEventArgs e)
+    {
+        var args = new RichEditBoxLitePasteEventArgs();
+        Paste?.Invoke(this, args);
+        if (args.Handled)
+        {
+            e.Handled = true;
+            return;
+        }
+        if (IsReadOnly) return;
+        DataPackageView? clipboard;
+        try
+        {
+            clipboard = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
+        }
+        catch (Exception)
+        {
+            clipboard = null;
+        }
+        if (clipboard is null || !clipboard.Contains(StandardDataFormats.Html)) return;
+        e.Handled = true;
+        try
+        {
+            var htmlFormat = await clipboard.GetHtmlFormatAsync();
+            Document.PasteHtml(HtmlCodec.ExtractClipboardFragment(htmlFormat), MaxLength);
+        }
+        catch (Exception)
+        {
+            await PastePlainTextFallbackAsync(clipboard);
+        }
+    }
+
+    private async Task PastePlainTextFallbackAsync(DataPackageView clipboard)
+    {
+        try
+        {
+            if (!clipboard.Contains(StandardDataFormats.Text)) return;
+            var plain = await clipboard.GetTextAsync() ?? string.Empty;
+            if (MaxLength > 0)
+            {
+                var available = Math.Max(0, MaxLength - (Document.Length - Document.Selection.Length));
+                if (plain.Length > available) plain = plain[..available];
+            }
+            Document.Selection.SetText(Microsoft.UI.Text.TextSetOptions.None, plain);
+        }
+        catch (Exception)
+        {
+            // Clipboard access is host-dependent; a failed paste leaves the document unchanged.
+        }
+    }
+
     private void OnInputCopying(object sender, TextControlCopyingToClipboardEventArgs e) { var args = new RichEditBoxLiteClipboardEventArgs(); CopyingToClipboard?.Invoke(this, args); e.Handled = args.Handled; }
     private void OnInputCutting(object sender, TextControlCuttingToClipboardEventArgs e) { var args = new RichEditBoxLiteClipboardEventArgs(); CuttingToClipboard?.Invoke(this, args); e.Handled = args.Handled; }
 

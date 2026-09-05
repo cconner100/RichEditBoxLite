@@ -57,6 +57,57 @@ public sealed class RichEditTextDocument
         }
     }
 
+    /// <summary>Loads sanitized HTML through the bounded package-owned codec, replacing the document.</summary>
+    public void SetHtml(string? html) => HtmlCodec.Import(this, html ?? string.Empty);
+
+    /// <summary>Exports the supported formatting profile as deterministic canonical HTML.</summary>
+    public string GetHtml() => HtmlCodec.Export(this);
+
+    /// <summary>
+    /// Parses HTML with the same codec as <see cref="SetHtml"/> and splices the
+    /// fragment over the current selection as a single undoable edit.
+    /// </summary>
+    internal void PasteHtml(string html, int maxLength = 0)
+    {
+        var fragment = HtmlCodec.Parse(html);
+        var fragmentText = fragment.Text;
+        var start = Selection.NormalizedStart;
+        var length = Selection.Length;
+        if (maxLength > 0)
+        {
+            var available = Math.Max(0, maxLength - (Length - length));
+            if (fragmentText.Length > available) fragmentText = fragmentText[..available];
+        }
+        RecordUndo();
+        var previousParagraphs = _paragraphFormats.ToArray();
+        var inheritedParagraph = GetParagraphFormat(start);
+        var perCharacter = Enumerable.Range(0, Length).Select(GetCharacterFormat).ToList();
+        perCharacter.RemoveRange(start, length);
+        var fragmentFormats = new CharacterFormatState[fragmentText.Length];
+        Array.Fill(fragmentFormats, DefaultCharacterFormat);
+        foreach (var run in fragment.Runs)
+        {
+            for (var position = run.Start; position < Math.Min(run.End, fragmentText.Length); position++)
+            {
+                fragmentFormats[position] = run.Format;
+            }
+        }
+        perCharacter.InsertRange(start, fragmentFormats);
+        _text = _text.Remove(start, length).Insert(start, fragmentText);
+        RebuildRuns(perCharacter);
+        RebuildParagraphsAfterReplace(previousParagraphs, start, length, fragmentText.Length, inheritedParagraph);
+        foreach (var paragraph in fragment.Paragraphs)
+        {
+            var mapped = start + paragraph.Key;
+            if (paragraph.Key < fragmentText.Length && (mapped == 0 || _text[mapped - 1] == '\n'))
+            {
+                _paragraphFormats[mapped] = paragraph.Value;
+            }
+        }
+        Selection.SetRange(start + fragmentText.Length, start + fragmentText.Length);
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
     public void BeginUndoGroup()
     {
         if (!_inUndoGroup)

@@ -19,10 +19,11 @@ model, Skia painting, and an Uno text-input bridge.
   automation.
 
 The repository currently implements the foundation of these items, including
-rendered and RTF-round-tripped H1/H2 headings and bullet/Arabic lists.
-Incremental layout caching, grapheme-aware movement, additional list marker
-styles, hyperlink activation, embedded bitmap painting, structural RTF tables,
-and sanitized HTML clipboard import remain follow-up work and are not reported
+rendered and RTF-round-tripped H1/H2 headings and bullet/Arabic lists, plus a
+bounded sanitized HTML codec (`SetHtml`/`GetHtml`, see [html.md](html.md)) that
+also backs HTML clipboard paste. Incremental layout caching, grapheme-aware
+movement, additional list marker styles, hyperlink activation, embedded bitmap
+painting, and structural RTF tables remain follow-up work and are not reported
 as complete.
 
 ## Requires Uno/platform services
