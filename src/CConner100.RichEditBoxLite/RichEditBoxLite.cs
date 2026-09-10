@@ -233,7 +233,10 @@ public sealed class RichEditBoxLite : Control
     private void OnInputTextChanged(object sender, TextChangedEventArgs e)
     {
         if (_updatingBridge || _inputBridge is null) return;
-        var next = ApplyCharacterCasing(_inputBridge.Text);
+        // Uno's TextBox uses CR for paragraph separators. Keep the document's
+        // LF convention before diffing, including delayed programmatic echoes.
+        var next = ApplyCharacterCasing(_inputBridge.Text.Replace('\r', '\n'));
+        if (next == _lastText) return;
         if (MaxLength > 0 && next.Length > MaxLength) next = next[..MaxLength];
         var prefix = CommonPrefix(_lastText, next);
         var suffix = CommonSuffix(_lastText, next, prefix);
@@ -242,7 +245,7 @@ public sealed class RichEditBoxLite : Control
         Document.Replace(prefix, _lastText.Length - prefix - suffix, next.Substring(prefix, next.Length - prefix - suffix));
         _updatingDocument = false;
         _lastText = next;
-        if (_inputBridge.Text != next)
+        if (_inputBridge.Text.Replace('\r', '\n') != next)
         {
             _updatingBridge = true;
             _inputBridge.Text = next;
@@ -346,7 +349,7 @@ public sealed class RichEditBoxLite : Control
     {
         if (_updatingDocument) return;
         TextChanging?.Invoke(this, new RichEditBoxLiteTextChangingEventArgs(true));
-        if (_inputBridge is not null && _inputBridge.Text != Document.Text)
+        if (_inputBridge is not null && _inputBridge.Text.Replace('\r', '\n') != Document.Text)
         {
             _updatingBridge = true;
             _inputBridge.Text = Document.Text;

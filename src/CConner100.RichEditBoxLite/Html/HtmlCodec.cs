@@ -76,6 +76,7 @@ internal static class HtmlCodec
         CharacterFormatState Format,
         ParagraphFormatState Ambient,
         bool Skip,
+        bool PreserveWhitespace,
         MarkerType ListType,
         int ListStart);
 
@@ -132,6 +133,7 @@ internal static class HtmlCodec
         var skip = false;
         var pendingBreak = false;
         var pendingSpace = false;
+        var preserveWhitespace = false;
 
         void FlushRun()
         {
@@ -192,6 +194,7 @@ internal static class HtmlCodec
             currentFormat = popped.Format;
             ambient = popped.Ambient;
             skip = popped.Skip;
+            preserveWhitespace = popped.PreserveWhitespace;
             if (skip) return;
             if (BlockElements.Contains(name)) pendingBreak = true;
             if (name is "td" or "th") pendingSpace = true;
@@ -225,7 +228,7 @@ internal static class HtmlCodec
             if (skip)
             {
                 // Inside a discarded subtree elements are tracked only for balance.
-                if (!selfClosing) stack.Push(new ElementEntry(name, currentFormat, ambient, skip, MarkerType.None, 1));
+                if (!selfClosing) stack.Push(new ElementEntry(name, currentFormat, ambient, skip, preserveWhitespace, MarkerType.None, 1));
                 return;
             }
             var isBlock = BlockElements.Contains(name);
@@ -235,7 +238,7 @@ internal static class HtmlCodec
                 if (pendingBreak || text.Length > paragraphStart) CommitParagraph();
             }
             stack.Push(new ElementEntry(
-                name, currentFormat, ambient, skip,
+                name, currentFormat, ambient, skip, preserveWhitespace,
                 name == "ul" ? MarkerType.Bullet : name == "ol" ? MarkerType.Arabic : MarkerType.None,
                 name == "ol" && int.TryParse(start, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedStart) && parsedStart > 0 ? parsedStart : 1));
             if (SkippedSubtreeElements.Contains(name)) skip = true;
@@ -270,6 +273,7 @@ internal static class HtmlCodec
                         };
                         break;
                 }
+                derived = ApplyParagraphStyles(derived, style);
                 var alignment = ParseAlignment(align) ?? ParseAlignmentFromStyle(style);
                 if (alignment is not null) derived = derived with { Alignment = alignment.Value };
                 ambient = derived;
@@ -294,7 +298,20 @@ internal static class HtmlCodec
                     }
                     break;
             }
-            if (!string.IsNullOrEmpty(style)) currentFormat = ApplyStyles(currentFormat, style);
+            if (!string.IsNullOrEmpty(style))
+            {
+                currentFormat = ApplyStyles(currentFormat, style);
+                foreach (var declaration in style.Split(';'))
+                {
+                    var parts = declaration.Split(':', 2);
+                    if (parts.Length == 2 && parts[0].Trim().Equals("white-space", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var value = parts[1].Trim().ToLowerInvariant();
+                        if (value is "pre-wrap" or "pre" or "break-spaces") preserveWhitespace = true;
+                        else if (value is "normal" or "nowrap") preserveWhitespace = false;
+                    }
+                }
+            }
             if (selfClosing) CloseElement(name);
         }
 
@@ -430,7 +447,13 @@ internal static class HtmlCodec
 
             i++;
             if (skip) continue;
-            if (IsHtmlWhitespace(ch))
+            if (preserveWhitespace && ch is '\r' or '\n')
+            {
+                if (ch == '\r' && i < html.Length && html[i] == '\n') i++;
+                CommitParagraph();
+                continue;
+            }
+            if (!preserveWhitespace && IsHtmlWhitespace(ch))
             {
                 pendingSpace = true;
                 continue;
@@ -482,19 +505,36 @@ internal static class HtmlCodec
             };
             var tag = listType != MarkerType.None ? "li" : headingTag ?? "p";
             builder.Append('<').Append(tag);
+            var styles = new List<string>();
             if (format.Alignment != ParagraphAlignment.Left)
             {
-                builder.Append(" style=\"text-align: ").Append(format.Alignment switch
+                styles.Add("text-align: " + (format.Alignment switch
                 {
                     ParagraphAlignment.Center => "center",
                     ParagraphAlignment.Right => "right",
                     _ => "justify"
-                }).Append('"');
+                }));
+            }
+            AddIndent("margin-left", format.LeftIndent);
+            AddIndent("margin-right", format.RightIndent);
+            AddIndent("text-indent", format.FirstLineIndent);
+            // Preserve spaces even when a formatting boundary splits a space run.
+            var content = text.AsSpan(paragraphStart, paragraphEnd - paragraphStart);
+            if (content.Contains(' ') || content.Contains('\t')) styles.Add("white-space: pre-wrap");
+            if (styles.Count > 0)
+            {
+                builder.Append(" style=\"").Append(string.Join("; ", styles)).Append('"');
+            }
+            void AddIndent(string property, float value)
+            {
+                if (value != 0 && float.IsFinite(value))
+                    styles.Add(property + ": " + value.ToString("R", CultureInfo.InvariantCulture) + "px");
             }
             builder.Append('>');
             var nestedHeading = listType != MarkerType.None ? headingTag : null;
             if (nestedHeading is not null) builder.Append('<').Append(nestedHeading).Append('>');
-            AppendRuns(builder, document, paragraphStart, paragraphEnd, defaults);
+            if (paragraphStart == paragraphEnd) builder.Append("<br>");
+            else AppendRuns(builder, document, paragraphStart, paragraphEnd, defaults);
             if (nestedHeading is not null) builder.Append("</").Append(nestedHeading).Append('>');
             builder.Append("</").Append(tag).Append('>');
             if (newline < 0) break;
@@ -608,6 +648,32 @@ internal static class HtmlCodec
             }
         }
         return null;
+    }
+
+    private static ParagraphFormatState ApplyParagraphStyles(ParagraphFormatState format, string? style)
+    {
+        if (string.IsNullOrEmpty(style)) return format;
+        foreach (var declaration in style.Split(';'))
+        {
+            var parts = declaration.Split(':', 2);
+            if (parts.Length != 2) continue;
+            var value = parts[1].Trim().ToLowerInvariant();
+            var scale = 1f;
+            if (value.EndsWith("px", StringComparison.Ordinal)) value = value[..^2];
+            else if (value.EndsWith("pt", StringComparison.Ordinal)) { value = value[..^2]; scale = 4f / 3f; }
+            else if (value != "0") continue;
+            if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var length)
+                || !float.IsFinite(length * scale)) continue;
+            length *= scale;
+            format = parts[0].Trim().ToLowerInvariant() switch
+            {
+                "margin-left" => format with { LeftIndent = length },
+                "margin-right" => format with { RightIndent = length },
+                "text-indent" => format with { FirstLineIndent = length },
+                _ => format
+            };
+        }
+        return format;
     }
 
     private static string? TryDecodeEntity(string html, int index, out int consumed)

@@ -9,7 +9,7 @@ does not target WinAppSDK or Uno native rendering.
 Install the current package:
 
 ```bash
-dotnet add package CConner100.RichEditBoxLite --version 0.1.2
+dotnet add package CConner100.RichEditBoxLite --version 0.1.3
 ```
 
 ```xml
@@ -21,6 +21,14 @@ xmlns:rte="using:CConner100.RichEditBoxLite"
 ```
 
 The public CLR and package namespace is `CConner100.RichEditBoxLite`.
+
+## Fixes in 0.1.3
+
+- Preserve paragraph boundaries and inline formatting when Uno's mounted input
+  bridge sends CR line separators back to the document.
+- Preserve paragraph indentation, significant spaces, and visible blank lines
+  through HTML export/import and browser rendering (issue #27).
+- Add a mounted desktop regression runner: `python3 scripts/check-html-round-trip.py`.
 
 ## What's new in 0.1.2
 
@@ -75,7 +83,7 @@ The public surface is deliberately WinUI-shaped, but a few types must come from
 `CConner100.RichEditBoxLite` because Uno's WinUI event-argument and text-object
 constructors are internal.
 
-| Area | v0.1.2 status |
+| Area | v0.1.3 status |
 |---|---|
 | Plain text, caret, selection, keyboard input | Implemented through Uno input bridge |
 | Character formats | Implemented for core format run properties |

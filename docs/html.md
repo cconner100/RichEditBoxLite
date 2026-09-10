@@ -19,7 +19,9 @@ string canonicalHtml = editor.Document.GetHtml();
 - Style declarations on any element: `font-weight`, `font-style`,
   `text-decoration(-line)`, `vertical-align: sub|super`, `color`,
   `background-color`, `font-size` (`pt`/`px`), `font-family`, and `text-align`
-  (block elements only). Colors accept `#rgb`, `#rrggbb`, `rgb()/rgba()`, and
+  (block elements only). Paragraph indents use `margin-left`, `margin-right`,
+  and `text-indent` (`px`/`pt`). `white-space: pre-wrap`, `pre`, and `break-spaces`
+  preserve whitespace; `normal`/`nowrap` restore collapsing. Colors accept `#rgb`, `#rrggbb`, `rgb()/rgba()`, and
   the common named colors.
 - HTML entities are decoded (named and numeric); numeric-encoded whitespace
   such as `&#9;` is preserved literally.
@@ -42,7 +44,9 @@ string canonicalHtml = editor.Document.GetHtml();
 
 `GetHtml` is deterministic: one block element per paragraph (`h1`, `h2`, `li`
 inside a grouped `ul`/`ol`, otherwise `p`), `text-align` styles for non-left
-alignment, inline tags in the fixed order
+alignment, pixel-valued paragraph indents, and `white-space: pre-wrap` on
+paragraphs containing spaces or tabs. Empty paragraphs contain `<br>` so they
+occupy a visible line in browser/print rendering. Inline tags use the fixed order
 `span` (font-family, font-size, color, background-color) → `strong` → `em` →
 `u` → `s` → `sub`/`sup`, and minimal escaping (`&amp;`, `&lt;`, `&gt;`,
 `&nbsp;` for U+00A0, `&#9;` for tabs). Re-importing canonical output reproduces
@@ -60,8 +64,9 @@ the same document and the same HTML.
   extra level; the indent is not exported back as nesting.
 - `br` produces a paragraph break (the model has no soft line break), so a
   `br` inside a paragraph exports as two block elements.
-- Consecutive regular spaces collapse on import per HTML whitespace rules;
-  non-breaking spaces are preserved.
+- Regular spaces collapse when importing ordinary HTML; canonical exported HTML
+  opts into whitespace preservation, retaining leading, repeated, and trailing
+  spaces across inline formatting boundaries. Non-breaking spaces are preserved.
 - Headings render with synthesized bold/size; explicit `h#` font styling in the
   source HTML is not merged into character runs.
 
@@ -73,3 +78,19 @@ splices the fragment over the selection as a single undoable edit (honoring
 `MaxLength`). If clipboard HTML retrieval fails, the control falls back to
 plain-text paste. Hosts that do not expose the HTML clipboard format keep the
 existing plain-text paste behavior.
+
+## Mounted-control regression (#27)
+
+Uno's input TextBox uses CR separators. The control converts those to the
+model's LF separators before computing edits, and ignores unchanged delayed
+notifications. This prevents a programmatic text echo from replacing formatted
+paragraphs and spreading the first run's formatting across them.
+
+Run `python3 scripts/check-html-round-trip.py` from the repository in a desktop
+session. It builds the desktop target, mounts the real controls, saves and
+reopens the four-line issue fixture, checks formatting at every character,
+then exercises input and undo. A temporary output directory contains the
+results, app log, and exact exported HTML for browser/print inspection.
+The runner exits nonzero for a mismatch or launch failure and stops only its
+own app process. Unit codec tests also cover significant whitespace, blank
+paragraphs, and indentation.

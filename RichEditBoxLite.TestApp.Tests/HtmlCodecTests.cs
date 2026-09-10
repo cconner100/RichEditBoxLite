@@ -7,6 +7,69 @@ namespace RichEditBoxLite.TestApp.Tests;
 
 public class HtmlCodecTests
 {
+    [TestCase("  - body")]
+    [TestCase("a  b ")]
+    [TestCase("\tindented\ttext")]
+    [TestCase("a\n\nend\n")]
+    public void HtmlRoundTrip_PreservesSignificantWhitespace(string text)
+    {
+        var source = new RichDocument();
+        source.SetText(TextSetOptions.None, text);
+        // Split whitespace across differently formatted runs, too.
+        source.GetRange(0, 1).CharacterFormat.Bold = FormatEffect.On;
+        var html = source.GetHtml();
+        var target = new RichDocument();
+        target.SetHtml(html);
+        target.Text.Should().Be(text);
+        target.GetHtml().Should().Be(html);
+        if (text.Contains(' ') || text.Contains('\t')) html.Should().Contain("white-space: pre-wrap");
+        if (text.Contains("\n\n")) html.Should().Contain("<p><br></p>");
+    }
+
+    [Test]
+    public void SetHtml_WhitespaceModeIsInheritedAndRestoredAfterNestedElements()
+    {
+        var document = new RichDocument();
+        document.SetHtml("<p style=\"white-space: pre-wrap\">  a<strong>  b</strong>  c</p><p>  collapsed   spaces </p>");
+        document.Text.Should().Be("  a  b  c\ncollapsed spaces");
+        document.GetRange(5, 6).CharacterFormat.Bold.Should().Be(FormatEffect.On);
+
+        document.SetHtml("<p style=\"white-space: pre-wrap\">a\r\nb\rc\nd</p>");
+        document.Text.Should().Be("a\nb\nc\nd");
+    }
+
+    [Test]
+    public void SetHtml_ParagraphIndentsConvertPointsAndIgnoreNonFiniteValues()
+    {
+        var document = new RichDocument();
+        document.SetHtml("<p style=\"margin-left: 18pt; margin-right: Infinitypx; text-indent: -3pt\">body</p>");
+        var format = document.GetRange(0, 4).ParagraphFormat;
+        format.LeftIndent.Should().Be(24);
+        format.RightIndent.Should().Be(0);
+        format.FirstLineIndent.Should().Be(-4);
+    }
+
+    [Test]
+    public void HtmlRoundTrip_PreservesParagraphIndents()
+    {
+        var source = new RichDocument();
+        source.SetText(TextSetOptions.None, "Title\nbody\nlast");
+        source.GetRange(6, 10).ParagraphFormat.SetIndents(-6, 24, 12);
+        source.GetRange(6, 10).ParagraphFormat.Alignment = ParagraphAlignment.Center;
+        var html = source.GetHtml();
+        html.Should().Contain("margin-left: 24px").And.Contain("text-indent: -6px");
+        var target = new RichDocument();
+        target.SetHtml(html);
+        var format = target.GetRange(6, 10).ParagraphFormat;
+        format.LeftIndent.Should().Be(24);
+        format.RightIndent.Should().Be(12);
+        format.FirstLineIndent.Should().Be(-6);
+        format.Alignment.Should().Be(ParagraphAlignment.Center);
+        target.GetRange(0, 1).ParagraphFormat.LeftIndent.Should().Be(0);
+        target.GetRange(11, 12).ParagraphFormat.LeftIndent.Should().Be(0);
+        target.GetHtml().Should().Be(html);
+    }
+
     [Test]
     public void SetHtml_ImportsSupportedBlocksAndInlineFormatting()
     {
@@ -56,7 +119,7 @@ public class HtmlCodecTests
         document.GetRange(0, 5).CharacterFormat.Bold = FormatEffect.On;
 
         document.GetHtml().Should().Be("<p><strong>Hello</strong></p><p>World</p>");
-        new RichDocument().GetHtml().Should().Be("<p></p>");
+        new RichDocument().GetHtml().Should().Be("<p><br></p>");
     }
 
     [Test]
