@@ -18,6 +18,12 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         MainWindow = new Window();
+        if (Environment.GetEnvironmentVariable("RICHEDIT_HTML_CHECK_OUTPUT") is { Length: > 0 } output)
+        {
+            MainWindow.Content = new HtmlRoundTripChecks(output);
+            MainWindow.Activate();
+            return;
+        }
 #if DEBUG
         MainWindow.UseStudio();
 #endif
